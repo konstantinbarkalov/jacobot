@@ -22,7 +22,7 @@ function startTelegramBot() {
     //bot.command('modern', ({ reply }) => reply('Yo'));
     //bot.command('hipster', Telegraf.reply('λ'));
     bot.on('message', (ctx) => {
-        const messageText = ctx.message.text.trim();
+        const messageText = ctx.message.text ? ctx.message.text.trim() : '';
         const prefixes = ['/ok ', '/o ', '/ок ', '/о ', '/']; // order matters!
         let cleanedMessageText = messageText;
         for (let i = 0; i < prefixes.length; i++) {
