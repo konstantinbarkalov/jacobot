@@ -3,8 +3,8 @@ class W2v {
     dim = 300;
     //vectors = require('./ruscorpora_1_300_10_delemmed.json');
     async preload() {
-        const modelTextFilePath = '../data/w2v/model.txt.trim';
-        //const modelTextFilePath = '../data/w2v/model.txt';
+        //const modelTextFilePath = '../data/w2v/model.txt.trim';
+        const modelTextFilePath = '../data/w2v/model.txt';
         //const rawVectorRecords = await this.loadRawVectorRecordsFromTxt(modelTextFilePath);
         const rawVectorRecords = await this.loadRawVectorRecordsFromTxt(modelTextFilePath);
         this.smartVectorSet = this.rawVectorsToSmartVectorSet(rawVectorRecords);
