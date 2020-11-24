@@ -1,0 +1,59 @@
+{
+    "users": {
+        "302206556": {
+            "genericUserUid": 302206556,
+            "name": "Noname",
+            "gender": "unspecified",
+            "stat": {
+                "score": 25436,
+                "gamesCount": 44
+            }
+        },
+        "369459962": {
+            "genericUserUid": 369459962,
+            "name": "Гоня",
+            "gender": "unspecified",
+            "stat": {
+                "score": 2150,
+                "gamesCount": 5
+            }
+        },
+        "524177820": {
+            "genericUserUid": 524177820,
+            "name": "Юлия",
+            "gender": "unspecified",
+            "stat": {
+                "score": 46300,
+                "gamesCount": 59
+            }
+        },
+        "undefined": {
+            "name": "Smith",
+            "gender": "unspecified",
+            "stat": {
+                "score": 0,
+                "gamesCount": 0
+            }
+        }
+    },
+    "userGroups": {
+        "302206556": {
+            "title": "Noname"
+        },
+        "369459962": {
+            "title": "Гоня"
+        },
+        "524177820": {
+            "title": "Юлия"
+        },
+        "undefined": {
+            "title": "Smith"
+        },
+        "-386573234": {
+            "title": "Private Ninja Group"
+        },
+        "-1001373540748": {
+            "title": "Бедросович всегда твой"
+        }
+    }
+}
