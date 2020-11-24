@@ -1,0 +1,1 @@
+sudo forever start -c "node --max-old-space-size=3072" -o jacobot_out.log -e jacobot_error.log startBot.js
