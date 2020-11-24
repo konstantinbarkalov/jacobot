@@ -1,5 +1,5 @@
 const { Telegraf } = require('telegraf');
-const botToken = require('./botToken.json').token;
+const botToken = require('../bot/secret/botToken.json').token;
 const bot = new Telegraf(botToken);
 bot.start((ctx) => ctx.reply('Welcome'));
 bot.help((ctx) => ctx.reply('Send me a sticker'));

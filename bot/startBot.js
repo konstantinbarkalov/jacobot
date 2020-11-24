@@ -2,7 +2,7 @@ const GameMaster = require('./gameMaster.js');
 const gameMaster = new GameMaster();
 
 const { Telegraf } = require('telegraf');
-const botToken = require('./botToken.json').token;
+const botToken = require('./secret/botToken.json').token;
 
 async function start() {
     console.log('preloading...');

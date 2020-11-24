@@ -1,1 +1,1 @@
-git clone https://github.com/konstantinbarkalov/jacobot-books.git
+git clone https://github.com/konstantinbarkalov/jacobot-books.git books
