@@ -14,7 +14,8 @@ class Game {
         messageText = messageText.toLowerCase().trim();
         const messageTokens = messageText.split(' ');
         if (!messageText[0] || messageText[0] === '?') {
-            return new GameOutputMessage(null, this.getCurrentStateText());
+            const {boardText, citationText} = this.getCurrentStateText();
+            return new GameOutputMessage(this, null, boardText, citationText);
         } else if (messageTokens.length === 1) {
             let player = this.players.find(player => player.gameUser === gameUser);
             if (!player) {
@@ -27,7 +28,7 @@ class Game {
             const fragmentText = messageTokens[0];
             return this.onAction_Fragment(fragmentText, player);
         } else {
-            return new GameOutputMessage('Без пробелов, плиз. (');
+            return new GameOutputMessage(this, 'Без пробелов, плиз. (');
         }
     }
     onAbort() {
@@ -35,7 +36,8 @@ class Game {
         this.isDone = true;
         this.endTimestamp = Date.now();
         this.gameMaster.removeActiveGame(this);
-        return new GameOutputMessage('Cтоп!11', this.getCurrentStateText());
+        const {boardText, citationText} = this.getCurrentStateText();
+        return new GameOutputMessage(this, 'Cтоп!11', boardText, citationText);
     }
     start() {
         this.isPlaing = true;
@@ -55,7 +57,8 @@ class Game {
         for (let i = 1; i < 5; i++) {
             this.hotWord.openBottomUnguessedTopSimonym(this.jacoGameUser);
         }
-        return new GameOutputMessage('Погнали!', this.getCurrentStateText());
+        const {boardText, citationText} = this.getCurrentStateText();
+        return new GameOutputMessage(this, 'Погнали!', boardText, citationText);
     }
     end() {
         this.isPlaing = false;
@@ -130,6 +133,7 @@ class Game {
         const upcasedFragmentText = fragmentText.toUpperCase();
         let answerText = '';
         let congratz = null;
+        let isFinal = false;
         const checkGuessResult = this.hotWord.guess(fragmentText, player);
         const stat = this.hotWord.getStat();
         const referateText = this.referate(checkGuessResult, player, fragmentText);
@@ -152,13 +156,14 @@ class Game {
             }
             player.score += scoreGain;
             answerText += ' [+' + scoreGain + '=' + player.score + '] ';
-            congratz = Math.max(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
+            congratz = Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
         }
 
 
         if (stat.hotWord.unguessedLetters.length === 0) {
             this.hotWord.openHotWord();
             this.end();
+            isFinal = true;
             const scoreGain = 1000;
             player.score +=scoreGain;
             answerText += ' [+' + scoreGain + '=' + player.score + '] ';
@@ -167,6 +172,7 @@ class Game {
         } else if (stat.hotWord.unguessedLetters.length < 3) {
             this.hotWord.openHotWord();
             this.end();
+            isFinal = true;
             const scoreGain = 500;
             player.score +=scoreGain;
             answerText += ' [+' + scoreGain + '=' + player.score + '] ';
@@ -188,7 +194,8 @@ class Game {
         }
         //console.log(checkGuessResult);
         //console.log(stat);
-        return new GameOutputMessage(answerText, this.getCurrentStateText(), null, congratz);
+        const {boardText, citationText} = this.getCurrentStateText();
+        return new GameOutputMessage(this, answerText, boardText, citationText, null, congratz, isFinal);
     }
     getGuessedBadLettersText() {
         const badLettersText = Object.keys(this.hotWord.guessHistory.fragment.letter.bad).reverse().join('');
@@ -218,7 +225,7 @@ class Game {
         } else {
             throw new Error('Wrong ratio');
         }
-        const citationInfoText = `«${this.randomCitation.bookInfo.name}» ${this.randomCitation.bookInfo.author} (${this.randomCitation.bookInfo.year}) [${positionText}]`;
+        const citationInfoText = `📖 «${this.randomCitation.bookInfo.name}» ${this.randomCitation.bookInfo.author} (${this.randomCitation.bookInfo.year}) [${positionText}]`;
         return citationInfoText;
     }
     getTopSimonymText() {
@@ -238,7 +245,10 @@ class Game {
             const rankCategory = (rank > 60000) ? 'редк.' : '';
             //const line = `#${idx + 1}: ${lemma} ${tag} ${proximityPercent} R${rankCategory}`;
             const line = `#${idx + 1}: ${lemma} ${proximityPercent} ${rankCategory}`;
-            lines.push(line);
+
+            if (isOpened) { // TEMPORARY TODO: configurable
+                lines.push(line);
+            }
         });
         return lines.join('\n');
         //const rowsCount = Math.floor(lines.length / 2);
@@ -252,42 +262,39 @@ class Game {
         //return rowLines.join('\n');
     }
     getCurrentStateText() {
-        let answerText = '';
+        let boardText = '';
+        let citationText = '';
         const maskedWord = this.isDone ? this.hotWord.wordText.toUpperCase() : this.hotWord.getMasked();
         const wordLength = this.hotWord.wordText.length;
 
-        answerText += `\n`;
-        answerText += `\n`;
         if (this.randomCitation) {
             const randomCitationInfoText = this.getRandomCitationInfoText();
             const [hotChunkWordPrefix, hotChunkWordPostfix] = this.randomCitation.hotChunk.text.split(this.randomCitation.hotChunk.word);
-            answerText += randomCitationInfoText;
-            answerText += `\n`;
-            answerText += `--------------------------------`;
-            answerText += `\n`;
-            answerText += `..." ${this.randomCitation.prefixText}${hotChunkWordPrefix}<b>${maskedWord}</b>${hotChunkWordPostfix}${this.randomCitation.postfixText} "...`;
-            answerText += `\n`;
+            citationText += randomCitationInfoText;
+            citationText += `\n`;
+            citationText += `--------`;
+            citationText += `\n`;
+            citationText += `<i>..." ${this.randomCitation.prefixText}${hotChunkWordPrefix}</i><b>${maskedWord}</b><i>${hotChunkWordPostfix}${this.randomCitation.postfixText} "...</i>`;
+            citationText += `\n`;
         }
-        answerText += `--------------------------------`;
-        answerText += `\n`;
-        answerText += `Слово: [ ${maskedWord} ] (${wordLength} букв)`;
-        answerText += `\n`;
-        answerText += `--------------------------------`;
-        answerText += `\n`;
-        answerText += this.getTopSimonymText();
-        answerText += `\n`;
-        answerText += `--------------------------------`;
-        answerText += `\n`;
-
         const badLettersText = this.getGuessedBadLettersText();
-        answerText += `Буквы были: <s>${badLettersText}</s>`;
-        answerText += `\n`;
+        boardText += `✳️ Слово: [ ${maskedWord} ] (${wordLength} букв)`;
+        boardText += `\n`;
+        boardText += `\n`;
+        boardText += `🆎 Буквы были: <s>${badLettersText.toUpperCase()}</s>`;
+        boardText += `\n`;
+        boardText += `\n`;
+        boardText += this.getTopSimonymText();
+        boardText += `\n`;
+        boardText += `\n`;
+
+
 
         if (this.isDone) {
             const secDiff = Math.floor((this.endTimestamp - this.startTimestamp) / 1000);
-            answerText += `Этот раунд окончен за ${secDiff} секунд. `;
+            boardText += `Этот раунд окончен за ${secDiff} секунд. `;
         }
-        return answerText;
+        return {boardText, citationText};
     }
 }
 module.exports = Game;

@@ -21,7 +21,11 @@ function startTelegramBot() {
     //bot.command('oldschool', (ctx) => ctx.reply('Hello'));
     //bot.command('modern', ({ reply }) => reply('Yo'));
     //bot.command('hipster', Telegraf.reply('λ'));
-    bot.on('message', (ctx) => {
+    bot.on('message', async (ctx) => {
+        if (ctx.message.from.id === ctx.botInfo.id) {
+            // on pin
+            return;
+        }
         const messageText = ctx.message.text ? ctx.message.text.trim() : '';
         const prefixes = ['/ok ', '/o ', '/ок ', '/о ', '/']; // order matters!
         let cleanedMessageText = messageText;
@@ -38,41 +42,96 @@ function startTelegramBot() {
         const genericUserGroupName = ctx.chat.first_name || ctx.chat.title;
         const gameOutputMessage = gameMaster.onMessage(cleanedMessageText, genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
         if (gameOutputMessage.answer) {
-            ctx.replyWithHTML(gameOutputMessage.answer);
+            const miniCongratz = (gameOutputMessage.congratz > 0 && gameOutputMessage.congratz <= 1) ? '👍 ' : '';
+            await ctx.replyWithHTML(miniCongratz + gameOutputMessage.answer);
         }
         const hasCongratz = gameOutputMessage.congratz !== null;
         if (hasCongratz) {
-            let emoji;
             if (gameOutputMessage.congratz >= 5) {
-                ctx.reply('😎');
+                await ctx.reply('😎');
             } else if (gameOutputMessage.congratz >= 4) {
-                ctx.reply('😆');
+                await ctx.reply('😎');
             } else if (gameOutputMessage.congratz >= 3) {
-                ctx.reply('😀');
+                await ctx.reply('😀');
             } else if (gameOutputMessage.congratz >= 2) {
-                ctx.reply('🙂');
-            } else if (gameOutputMessage.congratz >= 1) {
-                ctx.reply('👍');
-            } else if (gameOutputMessage.congratz <= 1) {
-                ctx.reply('👎');
-            }
-            if (emoji) {
-                setTimeout(() => {
-                    ctx.replyWithHTML(emoji);
-                }, 1000);
+                await ctx.reply('👍');
+            } else if (gameOutputMessage.congratz <= -1) {
+                await ctx.reply('👎');
             }
         }
-        if (gameOutputMessage.banner) {
-            let delay = hasCongratz ? 3000 : 2000;
-            setTimeout(() => {
-                ctx.replyWithHTML(gameOutputMessage.banner);
-            }, delay);
+
+
+        if (gameOutputMessage.citation) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            let genericMessageUid;
+            if (gameOutputMessage.isFinal) {
+                gameOutputMessage.game.liveCitation = null;
+                await bot.telegram.sendMessage(genericUserGroupUid, gameOutputMessage.citation, {parse_mode: 'HTML'});
+
+            } else {
+                if (gameOutputMessage.game.liveCitation) {
+                    if (gameOutputMessage.citation !== gameOutputMessage.game.liveCitation.sendedMessageText) {
+                        sendResult = await bot.telegram.editMessageText(gameOutputMessage.game.liveCitation.genericUserGroupUid, gameOutputMessage.game.liveCitation.genericMessageUid, null, gameOutputMessage.citation, {disable_notification: true, parse_mode: 'HTML'});
+                        genericMessageUid = sendResult.message_id;
+                    } else {
+                        genericMessageUid = gameOutputMessage.game.liveCitation.genericMessageUid;
+                    }
+                } else {
+                    sendResult = await bot.telegram.sendMessage(genericUserGroupUid, gameOutputMessage.citation, {parse_mode: 'HTML'});
+                    genericMessageUid = sendResult.message_id;
+                }
+                gameOutputMessage.game.liveCitation = {
+                    genericMessageUid,
+                    genericUserGroupUid,
+                    sendedMessageText: gameOutputMessage.citation,
+                }
+            }
         }
+
+        if (gameOutputMessage.board) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            let genericMessageUid;
+            if (gameOutputMessage.isFinal) {
+                if (gameOutputMessage.game.liveBoard) {
+                    try {
+                        await bot.telegram.unpinChatMessage(gameOutputMessage.game.liveBoard.genericUserGroupUid, genericMessageUid);
+                    } catch {
+                        // TODO
+                    }
+                }
+                gameOutputMessage.game.liveBoard = null;
+                await bot.telegram.sendMessage(genericUserGroupUid, gameOutputMessage.board, {parse_mode: 'HTML'});
+
+            } else {
+                if (gameOutputMessage.game.liveBoard) {
+                    if (gameOutputMessage.board !== gameOutputMessage.game.liveBoard.sendedMessageText) {
+                        sendResult = await bot.telegram.editMessageText(gameOutputMessage.game.liveBoard.genericUserGroupUid, gameOutputMessage.game.liveBoard.genericMessageUid, null, gameOutputMessage.board, {disable_notification: true, parse_mode: 'HTML'});
+                        genericMessageUid = sendResult.message_id;
+                    } else {
+                        genericMessageUid = gameOutputMessage.game.liveBoard.genericMessageUid;
+                    }
+                } else {
+                    sendResult = await bot.telegram.sendMessage(genericUserGroupUid, gameOutputMessage.board, {parse_mode: 'HTML'});
+                    genericMessageUid = sendResult.message_id;
+                    try {
+                        await bot.telegram.pinChatMessage(genericUserGroupUid, genericMessageUid);
+                    } catch {
+                        // TODO
+                    }
+                }
+                gameOutputMessage.game.liveBoard = {
+                    genericMessageUid,
+                    genericUserGroupUid,
+                    sendedMessageText: gameOutputMessage.board,
+                }
+            }
+        }
+
         if (gameOutputMessage.hint) {
-            let delay = gameOutputMessage.banner ? (hasCongratz ? 3500 : 2500) : (hasCongratz ? 1500 : 500) ;
+            await new Promise(resolve => setTimeout(resolve, 250));
             setTimeout(() => {
                 ctx.replyWithHTML(gameOutputMessage.hint);
-            }, delay);
+            }, 1000);
         }
     });
     bot.launch();

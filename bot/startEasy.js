@@ -24,8 +24,8 @@ function startPrompt() {
         if (gameOutputMessage.answer) {
             console.log('BOT> ' + gameOutputMessage.answer);
         }
-        if (gameOutputMessage.banner) {
-            console.log('BOT> ' + gameOutputMessage.banner);
+        if (gameOutputMessage.board) {
+            console.log('BOT> ' + gameOutputMessage.board);
         }
         if (gameOutputMessage.hint) {
             console.log('BOT> ' + gameOutputMessage.hint);

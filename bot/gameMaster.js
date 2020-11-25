@@ -32,7 +32,7 @@ class GameMaster {
             if (messageText[0] === '+') {
                 gameOutputMessage = this.startNewGame(gameUser, gameUserGroup);
             } else {
-                gameOutputMessage = new GameOutputMessage('Если захочешь сыграть, пиши "+" в чат.');
+                gameOutputMessage = new GameOutputMessage(null, 'Если захочешь сыграть, пиши "+" в чат.');
             }
         } else {
             if (messageText[0] === '!') {

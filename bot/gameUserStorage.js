@@ -2,7 +2,7 @@ const fs = require('fs');
 const GameUser = require('./gameUser');
 const GameUserGroup = require('./gameUserGroup');
 class GameUserStorage {
-    storageFilePath = './gameUserStorage.json';
+    storageFilePath = './db/gameUserStorage.json';
     users = {};
     groups = {};
     preload() {

@@ -1,9 +1,12 @@
 class GameOutputMessage {
-    constructor(answer, banner, hint, congratz) {
+    constructor(game, answer, board, citation, hint, congratz, isFinal) {
+        this.game = game;
         this.answer = answer;
-        this.banner = banner;
+        this.board = board;
+        this.citation = citation;
         this.hint = hint;
         this.congratz = congratz;
+        this.isFinal = isFinal;
     }
 }
 module.exports = GameOutputMessage;
