@@ -62,9 +62,9 @@ function startTelegramBot() {
 
 
         if (gameOutputMessage.citation) {
-            await new Promise(resolve => setTimeout(resolve, 250));
             let genericMessageUid;
             if (gameOutputMessage.isFinal) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 gameOutputMessage.game.liveCitation = null;
                 await bot.telegram.sendMessage(genericUserGroupUid, gameOutputMessage.citation, {parse_mode: 'HTML'});
 
@@ -92,6 +92,7 @@ function startTelegramBot() {
             await new Promise(resolve => setTimeout(resolve, 250));
             let genericMessageUid;
             if (gameOutputMessage.isFinal) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 if (gameOutputMessage.game.liveBoard) {
                     try {
                         await bot.telegram.unpinChatMessage(gameOutputMessage.game.liveBoard.genericUserGroupUid, genericMessageUid);

@@ -168,7 +168,7 @@ class Game {
             player.score +=scoreGain;
             answerText += ' [+' + scoreGain + '=' + player.score + '] ';
             congratz = 5;
-            answerText += `ВЫ ПОЛНОСТЬЮ УГАДАЛИ СЛОВО! "${upcasedFragmentText}", УРА!`;
+            answerText += `ВЫ ПОЛНОСТЬЮ УГАДАЛИ СЛОВО! "${this.hotWord.wordText.toUpperCase()}", УРА!`;
         } else if (stat.hotWord.unguessedLetters.length < 3) {
             this.hotWord.openHotWord();
             this.end();
@@ -278,10 +278,9 @@ class Game {
             citationText += `\n`;
         }
         const badLettersText = this.getGuessedBadLettersText();
-        boardText += `✳️ Слово: [ ${maskedWord} ] (${wordLength} букв)`;
+        boardText += `✳️ [ ${maskedWord} ] (${wordLength})`;
         boardText += `\n`;
-        boardText += `\n`;
-        boardText += `🆎 Буквы были: <s>${badLettersText.toUpperCase()}</s>`;
+        boardText += `🆎 <s>${badLettersText.toUpperCase()}</s>`;
         boardText += `\n`;
         boardText += `\n`;
         boardText += this.getTopSimonymText();
