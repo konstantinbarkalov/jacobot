@@ -9,11 +9,28 @@ async function start() {
     await gameMaster.preload();
     startTelegramBot();
 }
+function onAbout(ctx) {
+    const aboutHtml = gameMaster.onAbout();
+    ctx.reply(aboutHtml.answer, {parse_mode: 'HTML'});
+}
+function onRules(ctx) {
+    const rulesHtml = gameMaster.onRules();
+    ctx.reply(rulesHtml.answer, {parse_mode: 'HTML'});
+}
+function onMetrix(ctx) {
+    const metixHtml = gameMaster.onMetrix();
+    ctx.reply(metixHtml.answer, {parse_mode: 'HTML'});
+}
 function startTelegramBot() {
     const bot = new Telegraf(botToken);
-    bot.start((ctx) => ctx.reply('Welcome'));
+    bot.start(onAbout);
+    bot.command('about', onAbout);
+    bot.command('help', onAbout);
+    bot.command('?', onAbout);
+    bot.command('rules', onRules);
+    bot.command('metrix', onMetrix);
     bot.command('debug', (ctx) => {
-        return ctx.reply(JSON.stringify(ctx.message, null, 4));
+        ctx.reply(JSON.stringify(ctx.message, null, 4));
     });
     bot.on('message', async (ctx) => {
         if (ctx.message.from.id === ctx.botInfo.id) {
@@ -21,27 +38,27 @@ function startTelegramBot() {
             return;
         }
         const messageText = ctx.message.text ? ctx.message.text.trim() : '';
-        const prefixes = ['/ok ', '/o ', '/ок ', '/о ', '/']; // order matters!
+        //const prefixes = ['/ok ', '/o ', '/ок ', '/о ', '/']; // order matters!
         let cleanedMessageText = messageText;
-        for (let i = 0; i < prefixes.length; i++) {
-            const prefix = prefixes[i];
-            if (messageText.slice(0, prefix.length) === prefix) {
-                cleanedMessageText = messageText.slice(prefix.length);
-                break;
-            }
-        }
+        // for (let i = 0; i < prefixes.length; i++) {
+        //     const prefix = prefixes[i];
+        //     if (messageText.slice(0, prefix.length) === prefix) {
+        //         cleanedMessageText = messageText.slice(prefix.length);
+        //         break;
+        //     }
+        // }
         const genericUserUid = ctx.from.id;
         const genericUserName = ctx.from.first_name;
         const genericUserGroupUid = ctx.chat.id;
         const genericUserGroupName = ctx.chat.first_name || ctx.chat.title;
         const gameOutputMessage = gameMaster.onMessage(cleanedMessageText, genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
         if (gameOutputMessage.answer) {
-            let miniCongratz
+            let miniCongratz = '';
             if (gameOutputMessage.congratz > 0) {
                 miniCongratz = '👍 ';
             } else if (gameOutputMessage.congratz < 0) {
                 miniCongratz = '❌ ';
-            } else {
+            } else if (gameOutputMessage.congratz === 0) {
                 miniCongratz = '👌 ';
             }
             //await ctx.replyWithHTML(miniCongratz + gameOutputMessage.answer, {reply_to_message_id: ctx.message.message_id});

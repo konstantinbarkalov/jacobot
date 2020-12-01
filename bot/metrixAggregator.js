@@ -1,0 +1,26 @@
+class MetrixAggregator {
+    gameBuffer = [];
+    process(game) {
+        this.gameBuffer.push(game);
+        this.gameBuffer = this.gameBuffer.slice(0, 100);
+    }
+    getMetrixStats() {
+        const lastGame = this.gameBuffer[0];
+        const aggregationSum = this.gameBuffer.reduce((aggregation, game) => {
+            aggregation.durationSum += game.endTimestamp - game.startTimestamp;
+            aggregation.stepsSum += game.stepNum;
+            aggregation.playersSum += game.players.length;
+            return aggregation;
+        }, {durationSum: 0, stepsSum: 0, playersSum: 0});
+        const aggregation = {
+            durationMean: aggregationSum.durationSum / this.gameBuffer.length,
+            stepsMean: aggregationSum.stepsSum / this.gameBuffer.length,
+            playersMean: aggregationSum.playersSum / this.gameBuffer.length,
+            bufferLength: this.gameBuffer.length,
+            lastGameDate: lastGame ? lastGame.endTimestamp : null,
+        }
+        return aggregation;
+    }
+}
+
+module.exports = MetrixAggregator;

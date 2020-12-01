@@ -7,6 +7,7 @@ const PhraseBuilder = require('./phraseBuilder.js');
 class Game {
     stepNum = 0;
     jacoGameUser = new GameUser('never', 'Яков', 'male');
+    history = [];
     constructor(gameMaster, innitiatorGameUser, gameUserGroup) {
         this.gameMaster = gameMaster;
         this.innitiatorGameUser = innitiatorGameUser;
@@ -29,7 +30,7 @@ class Game {
                 this.players.push(player);
             };
             const fragmentText = messageTokens[0];
-            return this.onAction_Fragment(fragmentText, player);
+            return this.onAction(fragmentText, player);
         } else {
             return new GameOutputMessage(this, 'Без пробелов, плиз. (');
         }
@@ -70,7 +71,7 @@ class Game {
         this.players.forEach(player => {
             player.gameUser.stat.score += player.score;
             player.gameUser.stat.gamesCount++;
-        })
+        });
         this.gameMaster.removeActiveGame(this);
     }
 
@@ -344,7 +345,7 @@ class Game {
             return referateResult;
         }
     }
-    onAction_Fragment(fragmentText, player) {
+    onAction(fragmentText, player) {
         const checkGuessResult = this.hotWord.guess(fragmentText, player);
         const stat = this.hotWord.getStat();
         const proximity = this.gameMaster.nlpBackend.getProximity(this.hotWord.lemmaText, fragmentText);
@@ -391,7 +392,15 @@ class Game {
         //console.log(stat);
         const {boardText, citationText, shortCitationText} = this.getCurrentStateText();
         this.stepNum++;
-        return new GameOutputMessage(this, answerText, boardText, citationText, shortCitationText, hintText, aidText, congratzMax, isFinal);
+        const gameOutputMessage = new GameOutputMessage(this, answerText, boardText, citationText, shortCitationText, hintText, aidText, congratzMax, isFinal);
+        const historyEvent = {
+            player,
+            fragmentText,
+            gameOutputMessage,
+            date: new Date(),
+        };
+        this.history.push(historyEvent);
+        return gameOutputMessage;
     }
     getGuessedBadLettersText() {
         const badLettersText = Object.keys(this.hotWord.guessHistory.fragment.letter.bad).reverse().join('');
