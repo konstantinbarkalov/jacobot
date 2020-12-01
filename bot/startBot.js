@@ -12,15 +12,9 @@ async function start() {
 function startTelegramBot() {
     const bot = new Telegraf(botToken);
     bot.start((ctx) => ctx.reply('Welcome'));
-    //bot.help((ctx) => ctx.reply('Send me a sticker'));
     bot.command('debug', (ctx) => {
         return ctx.reply(JSON.stringify(ctx.message, null, 4));
     });
-    //bot.on('sticker', (ctx) => ctx.reply('👍'));
-    //bot.hears('hi', (ctx) => ctx.reply('Hey there'));
-    //bot.command('oldschool', (ctx) => ctx.reply('Hello'));
-    //bot.command('modern', ({ reply }) => reply('Yo'));
-    //bot.command('hipster', Telegraf.reply('λ'));
     bot.on('message', async (ctx) => {
         if (ctx.message.from.id === ctx.botInfo.id) {
             // on pin
@@ -42,7 +36,15 @@ function startTelegramBot() {
         const genericUserGroupName = ctx.chat.first_name || ctx.chat.title;
         const gameOutputMessage = gameMaster.onMessage(cleanedMessageText, genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
         if (gameOutputMessage.answer) {
-            const miniCongratz = (gameOutputMessage.congratz > 0 && gameOutputMessage.congratz <= 1) ? '👍 ' : '';
+            let miniCongratz
+            if (gameOutputMessage.congratz > 0) {
+                miniCongratz = '👍 ';
+            } else if (gameOutputMessage.congratz < 0) {
+                miniCongratz = '❌ ';
+            } else {
+                miniCongratz = '👌 ';
+            }
+            //await ctx.replyWithHTML(miniCongratz + gameOutputMessage.answer, {reply_to_message_id: ctx.message.message_id});
             await ctx.replyWithHTML(miniCongratz + gameOutputMessage.answer);
         }
         const hasCongratz = gameOutputMessage.congratz !== null;
@@ -55,7 +57,7 @@ function startTelegramBot() {
                 await ctx.reply('😀');
             } else if (gameOutputMessage.congratz >= 2) {
                 await ctx.reply('👍');
-            } else if (gameOutputMessage.congratz <= -1) {
+            } else if (gameOutputMessage.congratz <= -2) {
                 await ctx.reply('👎');
             }
         }
@@ -127,7 +129,28 @@ function startTelegramBot() {
                 }
             }
         }
-
+        if (gameOutputMessage.aid) {
+            await new Promise(resolve => setTimeout(resolve, 750));
+            setTimeout(() => {
+                if (gameOutputMessage.game.liveCitation) {
+                    //ctx.replyWithHTML(gameOutputMessage.aid, {reply_to_message_id: gameOutputMessage.game.liveBoard.genericMessageUid});
+                    ctx.replyWithHTML(gameOutputMessage.aid);
+                } else {
+                    ctx.replyWithHTML(gameOutputMessage.aid);
+                }
+            }, 1000);
+        }
+        if (gameOutputMessage.shortCitation) {
+            await new Promise(resolve => setTimeout(resolve, 750));
+            setTimeout(() => {
+                if (gameOutputMessage.game.liveCitation) {
+                    //ctx.replyWithHTML(gameOutputMessage.shortCitation, {reply_to_message_id: gameOutputMessage.game.liveBoard.genericMessageUid});
+                    ctx.replyWithHTML(gameOutputMessage.shortCitation);
+                } else {
+                    ctx.replyWithHTML(gameOutputMessage.shortCitation);
+                }
+            }, 1000);
+        }
         if (gameOutputMessage.hint) {
             await new Promise(resolve => setTimeout(resolve, 250));
             setTimeout(() => {

@@ -157,6 +157,9 @@ class HotWord {
                 mode: 'open',
             }
             this.addTopSimonymToHistory(topSimonymText, historyEvent, true);
+            return idx;
+        } else {
+            return null;
         }
     }
     openHotWordLetter(idx, gameUser) {
@@ -169,6 +172,9 @@ class HotWord {
                 mode: 'open',
             }
             this.addHotWordToHistory(hotLetter, historyEvent, true, true);
+            return idx;
+        } else {
+            return null;
         }
     }
     openHotWord(gameUser) {
@@ -180,6 +186,9 @@ class HotWord {
                 mode: 'open',
             }
             this.addHotWordToHistory(this.wordText, historyEvent, false, true);
+            return true;
+        } else {
+            return false;
         }
     }
     openBottomUnguessedTopSimonym(gameUser) {
@@ -187,8 +196,11 @@ class HotWord {
         const unguessedSimonymTextWidthIdx = unguessedTop[unguessedTop.length - 1];
         if (unguessedSimonymTextWidthIdx) {
             const unguessedSimonymIdx = unguessedSimonymTextWidthIdx.idx;
-            this.openTopSimonym(unguessedSimonymIdx, gameUser);
+            return this.openTopSimonym(unguessedSimonymIdx, gameUser);
+        } else {
+            return null;
         }
+
     }
     openRandomUnguessedHotLetter(gameUser) {
         const hotWordUnguessedLetterWithIdxes = this.wordText.split('').map((hotWordLetter, idx) => {return {hotWordLetter, idx}}).filter((hotWordLetterWithIdx) => !this.guessHistory.fragment.letter.good[hotWordLetterWithIdx.hotWordLetter]);
@@ -196,11 +208,13 @@ class HotWord {
             const randomIdx = Math.floor(Math.random() * hotWordUnguessedLetterWithIdxes.length);
             const hotWordUnguessedLetterWithIdx = hotWordUnguessedLetterWithIdxes[randomIdx];
             const hotWordLetterIdx = hotWordUnguessedLetterWithIdx.idx;
-            this.openHotWordLetter(hotWordLetterIdx, gameUser);
+            return this.openHotWordLetter(hotWordLetterIdx, gameUser);
+        } else {
+            return null;
         }
     }
     getMasked() {
-        let maskedText = this.wordText.split('').map(hotWordLetter => this.guessHistory.fragment.letter.good[hotWordLetter] ? hotWordLetter.toUpperCase() : '*').join('');
+        let maskedText = this.wordText.split('').map(hotWordLetter => this.guessHistory.fragment.letter.good[hotWordLetter] ? hotWordLetter.toUpperCase() : '●').join('');
         return maskedText;
     }
     getIsHotWordGuessed() {

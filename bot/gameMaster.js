@@ -1,6 +1,6 @@
 const NlpBackend = require('./nlpBackend/easy/backend.js');
 //const Game = require("./game.js");
-const Game = require("./game2.js");
+const Game = require("./game.js");
 const GameOutputMessage = require("./gameOutputMessage.js");
 const GameUser = require("./gameUser.js");
 const GameUserGroup = require('./gameUserGroup.js');

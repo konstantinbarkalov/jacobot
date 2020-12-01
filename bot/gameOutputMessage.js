@@ -1,10 +1,12 @@
 class GameOutputMessage {
-    constructor(game, answer, board, citation, hint, congratz, isFinal) {
+    constructor(game, answer, board, citation, shortCitation, hint, aid, congratz, isFinal) {
         this.game = game;
         this.answer = answer;
         this.board = board;
         this.citation = citation;
+        this.shortCitation = shortCitation;
         this.hint = hint;
+        this.aid = aid;
         this.congratz = congratz;
         this.isFinal = isFinal;
     }

@@ -156,10 +156,15 @@ class EasyNlpBackend {
             let prefixChunks = chunks.slice(0, bestHotCitationChunkIdx);
             let hotChunk = bestHotCandidate.chunk; // or chunks[bestHotCitationChunkIdx];
             let postfixChunks = chunks.slice(bestHotCitationChunkIdx + 1);
+
+            let shortPrefixChunks = prefixChunks.slice(prefixChunks.length - 5, prefixChunks.length);
+            let shortPostfixChunks = postfixChunks.slice(0, 5);
             const citation = {
                 prefixText: prefixChunks.map(chunk => chunk.text).join(''),
                 hotChunk,
                 postfixText: postfixChunks.map(chunk => chunk.text).join(''),
+                shortPrefixText: shortPrefixChunks.map(chunk => chunk.text).join(''),
+                shortPostfixText: shortPostfixChunks.map(chunk => chunk.text).join(''),
                 mark: bestHotCandidate.mark,
                 bookInfo: corporaCitation.bookInfo,
                 positionRatio: corporaCitation.positionRatio,
