@@ -16,11 +16,11 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch startBot.js",
+            "name": "Launch startJacobot.js",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\startBot.js"
+            "program": "${workspaceFolder}\\startJacobot.js"
         },
         {
             "type": "node",
