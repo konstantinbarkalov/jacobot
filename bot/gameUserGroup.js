@@ -1,6 +1,6 @@
 class GameUserGroup {
-    constructor(genericGroupUid, title) {
-        this.genericGroupUid = genericGroupUid;
+    constructor(genericUserGroupUid, title) {
+        this.genericUserGroupUid = genericUserGroupUid;
         this.title = title;
     }
 }

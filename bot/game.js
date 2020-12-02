@@ -128,7 +128,7 @@ class Game {
             this.hotWord.openBottomUnguessedTopSimonym(this.jacoGameUser);
         }
         const {boardText, citationText} = this.getCurrentStateText();
-        return new GamestepOutputMessage(this, 0, null, '⏱ Погнали!', boardText, citationText, null, 'Первый ход!..');
+        return new GamestepOutputMessage(this, 0, null, 'Погнали!', boardText, citationText, null, '⏱ Первый ход!..');
     }
     end() {
         this.isPlaing = false;

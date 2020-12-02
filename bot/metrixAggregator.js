@@ -1,8 +1,10 @@
+//const Devlog = require('./db/devlog');
 class MetrixAggregator {
     gameBuffer = [];
     process(game) {
         this.gameBuffer.push(game);
         this.gameBuffer = this.gameBuffer.slice(0, 100);
+        //Devlog.process(game);
     }
     getMetrixStats() {
         const lastGame = this.gameBuffer[0];
