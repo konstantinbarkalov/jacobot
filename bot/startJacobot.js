@@ -93,7 +93,11 @@ async function onMessage(ctx) {
 }
 async function richReply(ctx, outputMessage, genericUserGroupUid) {
     if (outputMessage instanceof GamestepOutputMessage) {
-        await richReplyGamestep(ctx, outputMessage, genericUserGroupUid);
+        try {
+            await richReplyGamestep(ctx, outputMessage, genericUserGroupUid);
+        } catch (err) {
+            console.warn(err);
+        }
     } else if (outputMessage instanceof MiscOutputMessage) {
         await richReplyMisc(ctx, outputMessage);
     } else {
