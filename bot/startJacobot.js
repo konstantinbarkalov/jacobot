@@ -99,7 +99,11 @@ async function richReply(ctx, outputMessage, genericUserGroupUid) {
             console.warn(err);
         }
     } else if (outputMessage instanceof MiscOutputMessage) {
-        await richReplyMisc(ctx, outputMessage);
+        try {
+            await richReplyMisc(ctx, outputMessage);
+        } catch (err) {
+            console.warn(err);
+        }
     } else {
         throw new Error('unknown outputMessage signature');
     }
