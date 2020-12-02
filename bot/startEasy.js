@@ -20,18 +20,18 @@ function startPrompt() {
         const fakeGenericUserName = 'Smith';
         const fakeGenericUserGroupUid = undefined;
         const fakeGenericUserGroupName = 'Smith';
-        const gameOutputMessage = gameMaster.onMessage(messageText,fakeGenericUserUid, fakeGenericUserName, fakeGenericUserGroupUid, fakeGenericUserGroupName);
-        if (gameOutputMessage.answer) {
-            console.log('BOT> ' + gameOutputMessage.answer);
+        const gamestepOutputMessage = gameMaster.onMessage(messageText,fakeGenericUserUid, fakeGenericUserName, fakeGenericUserGroupUid, fakeGenericUserGroupName);
+        if (gamestepOutputMessage.answer) {
+            console.log('BOT> ' + gamestepOutputMessage.answer);
         }
-        if (gameOutputMessage.board) {
-            console.log('BOT> ' + gameOutputMessage.board);
+        if (gamestepOutputMessage.board) {
+            console.log('BOT> ' + gamestepOutputMessage.board);
         }
-        if (gameOutputMessage.hint) {
-            console.log('BOT> ' + gameOutputMessage.hint);
+        if (gamestepOutputMessage.hint) {
+            console.log('BOT> ' + gamestepOutputMessage.hint);
         }
-        if (gameOutputMessage.congratz) {
-            for (let i = 0; i < gameOutputMessage.congratz; i++) {
+        if (gamestepOutputMessage.congratz) {
+            for (let i = 0; i < gamestepOutputMessage.congratz; i++) {
                 console.log('BOT> CONGRATZ 👍');
             }
         }

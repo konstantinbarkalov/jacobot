@@ -1,13 +1,15 @@
 // 🧠💠🧩💡🔦🔍💬ℹ️✏️👉
-const GameOutputMessage = require("./gameOutputMessage.js");
+const GamestepOutputMessage = require("./gamestepOutputMessage.js");
 const GameUser = require('./gameUser.js');
 const HotWord = require('./hotWord.js');
+const MiscOutputMessage = require('./miscOutputMessage.js');
 const PhraseBuilder = require('./phraseBuilder.js');
 
 class Game {
     stepNum = 0;
     jacoGameUser = new GameUser('never', 'Яков', 'male');
     history = [];
+    isInCooldown = false;
     constructor(gameMaster, innitiatorGameUser, gameUserGroup) {
         this.gameMaster = gameMaster;
         this.innitiatorGameUser = innitiatorGameUser;
@@ -15,11 +17,14 @@ class Game {
         this.players = [{score: 0, gameUser: innitiatorGameUser}];
     }
     onMessage(messageText, gameUser) {
+        if (this.isInCooldown) {
+            return null;
+        }
         messageText = messageText.toLowerCase().trim();
         const messageTokens = messageText.split(' ');
-        if (!messageText[0] || messageText[0] === '?') {  // TODO
+        if (messageText === '?') {  // TODO
             const {boardText, citationText} = this.getCurrentStateText(); // TODO
-            return new GameOutputMessage(this, null, boardText, citationText, null, null, null, null, false, true); // TODO
+            return new GamestepOutputMessage(this, 0, null, null, boardText, citationText, null, null, null, null, false, true); // TODO
         } else if (messageTokens.length === 1) {
             let player = this.players.find(player => player.gameUser === gameUser);
             if (!player) {
@@ -32,17 +37,78 @@ class Game {
             const fragmentText = messageTokens[0];
             return this.onAction(fragmentText, player);
         } else {
-            return new GameOutputMessage(this, 'Без пробелов, плиз. Я пока ещё не понимаю ни одной команды с пробелом. Прости. ☺️ Может /help?');
+            return new MiscOutputMessage(this, 'Без пробелов, плиз. Я пока ещё не понимаю ни одной команды с пробелом. Прости. ☺️ Может /help?');
         }
     }
+    onAction(fragmentText, player) {
+        const checkGuessResult = this.hotWord.guess(fragmentText, player);
+        const stat = this.hotWord.getStat();
+        const proximity = this.gameMaster.nlpBackend.getProximity(this.hotWord.lemmaText, fragmentText);
+        const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity);
+        const referateText = PhraseBuilder.phrasesToText(referatePhrases);
+        const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity);
+        player.score+= scoreGainSum;
+
+        let answerText = '';
+        answerText += referateText;
+        answerText += '\n';
+
+        scoreGainTextLines.forEach(answerTextLine => answerText += answerTextLine + '\n');
+
+        let hintPhrase = '';
+        let aidPhrase = '';
+        if (isFinal) {
+            this.hotWord.openHotWord();
+            this.end();
+            hintPhrase = '⏹ эта игра окончена, напишите мне /go или «+» чтобы сыграть ещё раз.';
+        } else {
+            hintPhrase = '⏱ Следующий ход!..';
+            if (stat.topSimonym.unguessedSimonyms.length) {
+                const topSinonymIdx = this.hotWord.openBottomUnguessedTopSimonym(this.innitiatorGameUser);
+                if (topSinonymIdx !== null) {
+                    const topSinonymText = this.hotWord.topSimonymTexts[topSinonymIdx];
+                    const topSinonymProximityPercent = (this.topSimonyms[topSinonymIdx].proximity * 100).toFixed(0) + '%';
+                    aidPhrase = `💠 открываю новую нейроподсказку — топ-слово: #️⃣ <b>#${topSinonymIdx + 1} ${topSinonymText.toUpperCase()} ${topSinonymProximityPercent}</b>.`;
+                } else {
+                    throw new Error();
+                }
+            } else if (stat.hotWord.unguessedLetters.length) {
+                const hotLetterIdx = this.hotWord.openRandomUnguessedHotLetter(this.innitiatorGameUser);
+                if (hotLetterIdx !== null) {
+                    const hotWordLetter = this.hotWord.wordText[hotLetterIdx];
+                    aidPhrase = `💠 новая подсказка: откроем букву — ❇️ "<b>${hotWordLetter.toUpperCase()}</b>". Есть идеи?`;
+                } else {
+                    throw new Error();
+                }
+            }
+        }
+        const hintText = PhraseBuilder.phrasesToText([hintPhrase]);
+        const aidText = PhraseBuilder.phrasesToText([aidPhrase]);
+        //console.log(checkGuessResult);
+        //console.log(stat);
+        const {boardText, citationText, shortCitationText} = this.getCurrentStateText();
+        this.stepNum++;
+        const preAnswerText = '⏱ Ответ принят! Итак...';
+        const gamestepOutputMessage = new GamestepOutputMessage(this, 3000, preAnswerText, answerText, boardText, citationText, shortCitationText, hintText, aidText, congratzMax, isFinal);
+        const historyEvent = {
+            player,
+            fragmentText,
+            gamestepOutputMessage,
+            date: new Date(),
+        };
+        this.history.push(historyEvent);
+        return gamestepOutputMessage;
+    }
+
     onAbort() {
         this.isPlaing = false;
         this.isDone = true;
         this.endTimestamp = Date.now();
         this.gameMaster.removeActiveGame(this);
         const {boardText, citationText} = this.getCurrentStateText();
-        return new GameOutputMessage(this, 'Cтоп!11', boardText, citationText);
+        return new GamestepOutputMessage(this, 0, null, 'Кто-то дернул стоп-кран! Игра окончена.', boardText, citationText, null, null, null, null, true);
     }
+
     start() {
         this.isPlaing = true;
         this.isDone = false;
@@ -62,7 +128,7 @@ class Game {
             this.hotWord.openBottomUnguessedTopSimonym(this.jacoGameUser);
         }
         const {boardText, citationText} = this.getCurrentStateText();
-        return new GameOutputMessage(this, '⏱ Погнали!', boardText, citationText, null, 'Первый ход!..');
+        return new GamestepOutputMessage(this, 0, null, '⏱ Погнали!', boardText, citationText, null, 'Первый ход!..');
     }
     end() {
         this.isPlaing = false;
@@ -168,7 +234,7 @@ class Game {
                     phrase = `слово «<b>${upcasedFragmentText}</b>» уже называли, его близость к загаданному ${proximityPercent}. Постарайтесь потратить следующий ход более полезно.`;
                 } else {
                     // CASE: такое больше (неполезное) слово в словаре есть, ещё не называли
-                    phrase = `*️⃣ информация по слову "${upcasedFragmentText}": его близость к загаданному ${proximityPercent}. Надеюсь это как-то поможет.`;
+                    phrase = `*️⃣ информация по слову «<b>${upcasedFragmentText}</b>»: его близость к загаданному ${proximityPercent}. Надеюсь это как-то поможет.`;
                 }
             } else {
                 // CASE: (неполезное) словарное небольшое слово-фрагмент
@@ -213,7 +279,7 @@ class Game {
                     } else if (rnd > 0.1) {
                         phrase = `🆎 плохая новость: такой буквы нет. Хорошая новость: на одну проверенную букву стало меньше. «<b>${upcasedFragmentText}</b>» исключена.`;
                     } else {
-                        phrase = `🆎 в слове нет буквы "${upcasedFragmentText}"`;
+                        phrase = `🆎 в слове нет буквы «<b>${upcasedFragmentText}</b>»`;
                     }
                 }
             } else {
@@ -222,15 +288,15 @@ class Game {
                     // CASE: несловарный фрагмент (не буква), новых букв не угадано, уже угадывали раньше фрагмент, в котором этот есть целиком
                     phrase = `✴️ к сожалению, новых букв не угадано. Обратите внимание, что ✳️ «<b>${upcasedFragmentText}</b>» содержится в "${checkGuessResult.hotWord.wasGoodGuessedSubstring.toUpperCase()}", это ранее уже угадывали`;
                 } else {
-                    phrase = `✴️ несловарный фрагмент "${upcasedFragmentText}", ни одной буквы не угадано`;
+                    phrase = `✴️ несловарный фрагмент «<b>${upcasedFragmentText}</b>», ни одной буквы не угадано`;
                 }
             }
         }
         let postPhrase = '';
-        if (stat.hotWord.unguessedLetters === 0) {
-            postPhrase = `\n✅ ВЫ ПОЛНОСТЬЮ УГАДАЛИ СЛОВО! "${this.hotWord.wordText.toUpperCase()}", УРА!`;
-        } else if (stat.hotWord.unguessedLetters < 3) {
-            postPhrase = `\n✅ осталось всего ${stat.hotWord.unguessedLetters.length} букв, а значит по правилам слово ${this.hotWord.wordText.toUpperCase()} раскрыто! Это победа!`;
+        if (stat.hotWord.unguessedLetters.length === 0) {
+            postPhrase = `\n✅ ВЫ ПОЛНОСТЬЮ УГАДАЛИ СЛОВО! «<b>${this.hotWord.wordText.toUpperCase()}</b>», УРА!`;
+        } else if (stat.hotWord.unguessedLetters.length < 3) {
+            postPhrase = `\n✅ осталось всего ${stat.hotWord.unguessedLetters.length} букв, а значит по правилам слово «<b>${this.hotWord.wordText.toUpperCase()}</b>» раскрыто! Это победа!`;
         }
         const phrases = [phrase, postPhrase];
         return phrases;
@@ -345,63 +411,6 @@ class Game {
             return referateResult;
         }
     }
-    onAction(fragmentText, player) {
-        const checkGuessResult = this.hotWord.guess(fragmentText, player);
-        const stat = this.hotWord.getStat();
-        const proximity = this.gameMaster.nlpBackend.getProximity(this.hotWord.lemmaText, fragmentText);
-        const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity);
-        const referateText = PhraseBuilder.phrasesToText(referatePhrases);
-        const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity);
-        player.score+= scoreGainSum;
-
-        let answerText = '';
-        answerText += referateText;
-        answerText += '\n';
-
-        scoreGainTextLines.forEach(answerTextLine => answerText += answerTextLine + '\n');
-
-        let hintPhrase = '';
-        let aidPhrase = '';
-        if (isFinal) {
-            this.hotWord.openHotWord();
-            this.end();
-            hintPhrase = '⏹ эта игра окончена!, напишите мне "+" чтобы сыграть ещё раз.';
-        } else {
-            hintPhrase = '⏱ Следующий ход!..';
-            if (stat.topSimonym.unguessedSimonyms.length) {
-                const topSinonymIdx = this.hotWord.openBottomUnguessedTopSimonym(this.innitiatorGameUser);
-                if (topSinonymIdx !== null) {
-                    const topSinonymText = this.hotWord.topSimonymTexts[topSinonymIdx];
-                    aidPhrase = `💠 открываю новую подсказку — топ-слово: #️⃣ #${topSinonymIdx + 1} «<b>${topSinonymText.toUpperCase()}</b>».`;
-                } else {
-                    throw new Error();
-                }
-            } else if (stat.hotWord.unguessedLetters.length) {
-                const hotLetterIdx = this.hotWord.openRandomUnguessedHotLetter(this.innitiatorGameUser);
-                if (hotLetterIdx !== null) {
-                    const hotWordLetter = this.hotWord.wordText[hotLetterIdx];
-                    aidPhrase = `💠 новая подсказка: откроем букву — ❇️ "<b>${hotWordLetter.toUpperCase()}</b>". Есть идеи?`;
-                } else {
-                    throw new Error();
-                }
-            }
-        }
-        const hintText = PhraseBuilder.phrasesToText([hintPhrase]);
-        const aidText = PhraseBuilder.phrasesToText([aidPhrase]);
-        //console.log(checkGuessResult);
-        //console.log(stat);
-        const {boardText, citationText, shortCitationText} = this.getCurrentStateText();
-        this.stepNum++;
-        const gameOutputMessage = new GameOutputMessage(this, answerText, boardText, citationText, shortCitationText, hintText, aidText, congratzMax, isFinal);
-        const historyEvent = {
-            player,
-            fragmentText,
-            gameOutputMessage,
-            date: new Date(),
-        };
-        this.history.push(historyEvent);
-        return gameOutputMessage;
-    }
     getGuessedBadLettersText() {
         const badLettersText = Object.keys(this.hotWord.guessHistory.fragment.letter.bad).reverse().join('');
         return badLettersText;
@@ -492,7 +501,7 @@ class Game {
         const unguessedLettersCount = this.hotWord.getStat().hotWord.unguessedLetters.length;
 
         boardText += `✳️ `;
-        boardText += `[ <b>${maskedWord}</b> ] ${wordLength} / ${unguessedLettersCount}`;
+        boardText += `[ <b>${maskedWord}</b> ] ${unguessedLettersCount} / ${wordLength}`;
         boardText += `\n`;
         //boardText += `—`;
         //boardText += `\n`;

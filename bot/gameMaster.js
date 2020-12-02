@@ -2,9 +2,10 @@ const fs = require('fs');
 const NlpBackend = require('./nlpBackend/easy/backend.js');
 //const Game = require("./game.js");
 const Game = require("./game.js");
-const GameOutputMessage = require("./gameOutputMessage.js");
+const GamestepOutputMessage = require("./gamestepOutputMessage.js");
 const GameUserStorage = require('./gameUserStorage.js');
 const MetrixAggregator = require('./metrixAggregator.js');
+const MiscOutputMessage = require('./miscOutputMessage.js');
 const aboutText = fs.readFileSync('./about.html',{encoding: 'utf8'});
 const rulesText = fs.readFileSync('./rules.html',{encoding: 'utf8'});
 const helpText = fs.readFileSync('./help.html',{encoding: 'utf8'});
@@ -27,19 +28,19 @@ class GameMaster {
         this.metrixAggregator.process(game);
     }
     onAbout() {
-        //return new GameOutputMessage(null, aboutText);
+        //return new MiscOutputMessage(null, aboutText);
         const liveAboutHtml = fs.readFileSync('./about.html',{encoding: 'utf8'});
-        return new GameOutputMessage(null, liveAboutHtml);
+        return new MiscOutputMessage(null, liveAboutHtml);
     }
     onRules() {
-        //return new GameOutputMessage(null, rulesText);
+        //return new MiscOutputMessage(null, rulesText);
         const liveRulesHtml = fs.readFileSync('./rules.html',{encoding: 'utf8'});
-        return new GameOutputMessage(null, liveRulesHtml);
+        return new MiscOutputMessage(null, liveRulesHtml);
     }
     onHelp() {
-        //return new GameOutputMessage(null, helpText);
+        //return new MiscOutputMessage(null, helpText);
         const liveHelpHtml = fs.readFileSync('./help.html',{encoding: 'utf8'});
-        return new GameOutputMessage(null, liveHelpHtml);
+        return new MiscOutputMessage(null, liveHelpHtml);
     }
     onMetrix() {
         const metrixStats = this.metrixAggregator.getMetrixStats();
@@ -52,39 +53,39 @@ class GameMaster {
 
         }
         const statsAsJson = JSON.stringify(humanReadableStats, null, 4);
-        return new GameOutputMessage(null, statsAsJson);
+        return new MiscOutputMessage(null, statsAsJson);
     }
     onUnknown() {
-        const gameOutputMessage = new GameOutputMessage(null, 'Если захочешь сыграть, пиши /go в чат.');
-        return gameOutputMessage;
+        const gamestepOutputMessage = new MiscOutputMessage(null, 'Если захочешь сыграть, пиши /go в чат.');
+        return gamestepOutputMessage;
     }
     onGo(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName) {
-        let gameOutputMessage;
+        let gamestepOutputMessage;
         let gameUser = this.gameUserStorage.getOrCreateGameUser(genericUserUid, genericUserName );
         let gameUserGroup = this.gameUserStorage.getOrCreateGameUserGroup(genericUserGroupUid, genericUserGroupName);
         const activeGame = this.activeGames.find(activeGame => activeGame.gameUserGroup === gameUserGroup);
 
         if (!activeGame) {
-            gameOutputMessage = this.startNewGame(gameUser, gameUserGroup);
+            gamestepOutputMessage = this.startNewGame(gameUser, gameUserGroup);
         } else {
-            gameOutputMessage = new GameOutputMessage(null, 'В этом чате уже идет игра. Пиши /stop если хочешь её закончить.');
+            gamestepOutputMessage = new MiscOutputMessage(null, 'В этом чате уже идет игра. Пиши /stop если хочешь её закончить.');
         }
-        return gameOutputMessage;
+        return gamestepOutputMessage;
     }
     onAbort(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName) {
-        let gameOutputMessage;
+        let gamestepOutputMessage;
         let gameUser = this.gameUserStorage.getOrCreateGameUser(genericUserUid, genericUserName );
         let gameUserGroup = this.gameUserStorage.getOrCreateGameUserGroup(genericUserGroupUid, genericUserGroupName);
         const activeGame = this.activeGames.find(activeGame => activeGame.gameUserGroup === gameUserGroup);
         if (activeGame) {
-            gameOutputMessage = activeGame.onAbort(gameUser, gameUserGroup);
+            gamestepOutputMessage = activeGame.onAbort(gameUser, gameUserGroup);
         } else {
-            gameOutputMessage = new GameOutputMessage(null, 'В этом чате не идет игра, заканчивать нечего. Может быть /help?');
+            gamestepOutputMessage = new MiscOutputMessage(null, 'В этом чате не идет игра, заканчивать нечего. Может быть /help?');
         }
-        return gameOutputMessage;
+        return gamestepOutputMessage;
     }
     onMessage(messageText, genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName) {
-        let gameOutputMessage;
+        let gamestepOutputMessage;
         let gameUser = this.gameUserStorage.getOrCreateGameUser(genericUserUid, genericUserName );
         let gameUserGroup = this.gameUserStorage.getOrCreateGameUserGroup(genericUserGroupUid, genericUserGroupName);
 
@@ -92,20 +93,20 @@ class GameMaster {
 
         if (!activeGame) {
             if (messageText === '+') {
-                gameOutputMessage = this.onGo(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
+                gamestepOutputMessage = this.onGo(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
             } else if (messageText === '?') {
-                gameOutputMessage = this.onAbout();
+                gamestepOutputMessage = this.onAbout();
             } else {
-                gameOutputMessage = this.onUnknown();
+                gamestepOutputMessage = this.onUnknown();
             }
         } else {
             if (messageText === '!!!') {
-                gameOutputMessage = this.onAbort(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
+                gamestepOutputMessage = this.onAbort(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
             } else {
-                gameOutputMessage = activeGame.onMessage(messageText, gameUser);
+                gamestepOutputMessage = activeGame.onMessage(messageText, gameUser);
             }
         }
-        return gameOutputMessage;
+        return gamestepOutputMessage;
     }
 }
 module.exports = GameMaster;
