@@ -96,13 +96,13 @@ async function richReply(ctx, outputMessage, genericUserGroupUid) {
         try {
             await richReplyGamestep(ctx, outputMessage, genericUserGroupUid);
         } catch (err) {
-            console.warn(err);
+            console.log(err);
         }
     } else if (outputMessage instanceof MiscOutputMessage) {
         try {
             await richReplyMisc(ctx, outputMessage);
         } catch (err) {
-            console.warn(err);
+            console.log(err);
         }
     } else {
         throw new Error('unknown outputMessage signature');
