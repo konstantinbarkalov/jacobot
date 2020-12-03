@@ -92,7 +92,7 @@ class EasyNlpBackend {
 
         const minUniqueVectorizableLemmasCount = 10;
         if (uniqueVectorizableLemmasCount < minUniqueVectorizableLemmasCount) {
-            console.warn('uniqueVectorizableLemmasCount < 10');
+            console.warn('uniqueVectorizableLemmasCount < 10, dropping this one');
             return null;
         }
 
@@ -101,7 +101,12 @@ class EasyNlpBackend {
             const rank = this.w2v.getRank(chunk.lemma, chunk.tag);
             const isGoodRank = (rank !== null && rank >= minRank && rank < maxRank);
             const isGoodPredefinedTag = chunk.tag === tag;
-            const isGood = isGoodRank && isGoodPredefinedTag;
+            const isGoodRussian = (/^[а-яА-Я]+$/).test(chunk.word); // TODO unstict - & ё
+            if (isGoodRank && !isGoodRussian) {
+                debugger;
+            }
+            const isGood = isGoodRank && isGoodPredefinedTag && isGoodRussian;
+
 
             //// marks
 
