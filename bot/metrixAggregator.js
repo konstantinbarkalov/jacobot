@@ -7,7 +7,7 @@ class MetrixAggregator {
         //Devlog.process(game);
     }
     getMetrixStats() {
-        const lastGame = this.gameBuffer[0];
+        const lastGame = this.gameBuffer[this.gameBuffer.length - 1];
         const aggregationSum = this.gameBuffer.reduce((aggregation, game) => {
             aggregation.durationSum += game.endTimestamp - game.startTimestamp;
             aggregation.stepsSum += game.stepNum;
