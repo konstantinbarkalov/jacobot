@@ -383,7 +383,7 @@ class Game {
             scoreGains.push(scoreGain);
         }
         if (stat.hotWord.unguessedLetters.length < 3 && this.stepNum < 10) {
-            const scoreGainValue = 3000 / this.stepNum;
+            const scoreGainValue = 3000 / (this.stepNum + 1);
             const scoreGain = {
                 subject: 'быстрая победа',
                 value: scoreGainValue,
@@ -424,11 +424,11 @@ class Game {
             positionText = 'в начале книги';
         } else if (positionRatio >= 0.15 && positionRatio < 0.35) {
             positionText = 'в середине первой половины книги';
-        } else if (positionRatio >= 0.35 && positionRatio < 0.45) {
+        } else if (positionRatio >= 0.35 && positionRatio < 0.48) {
             positionText = 'ближе к концу первой половины книги';
-        } else if (positionRatio >= 0.45 && positionRatio < 0.55) {
+        } else if (positionRatio >= 0.48 && positionRatio < 0.52) {
             positionText = 'на экваторе книги';
-        }else if (positionRatio >= 0.55 && positionRatio < 0.65) {
+        }else if (positionRatio >= 0.52 && positionRatio < 0.65) {
             positionText = 'в начале второй половины книги';
         } else if (positionRatio >= 0.65 && positionRatio < 0.85) {
             positionText = 'в середине второй половины книги';

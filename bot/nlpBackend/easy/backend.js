@@ -103,7 +103,7 @@ class EasyNlpBackend {
             const isGoodPredefinedTag = chunk.tag === tag;
             const isGoodRussian = (/^[а-яА-Я]+$/).test(chunk.word); // TODO unstict - & ё
             if (isGoodRank && !isGoodRussian) {
-                debugger;
+                //debugger;
             }
             const isGood = isGoodRank && isGoodPredefinedTag && isGoodRussian;
 

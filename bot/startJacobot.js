@@ -167,7 +167,7 @@ async function richReplyGamestep(ctx, gamestepOutputMessage, genericUserGroupUid
     if (gamestepOutputMessage.citation) {
         let genericMessageUid;
         if (gamestepOutputMessage.isFinal) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             gamestepOutputMessage.game.liveCitation = null;
             await bot.telegram.sendMessage(genericUserGroupUid, gamestepOutputMessage.citation, {parse_mode: 'HTML', disable_web_page_preview: true, disable_notification: true});
 
@@ -199,7 +199,7 @@ async function richReplyGamestep(ctx, gamestepOutputMessage, genericUserGroupUid
     if (gamestepOutputMessage.board) {
         let genericMessageUid;
         if (gamestepOutputMessage.isFinal) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             if (gamestepOutputMessage.game.liveBoard) {
                 if (isPinningScenario) {
                     try {
