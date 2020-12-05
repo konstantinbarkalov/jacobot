@@ -2,8 +2,8 @@
 class MetrixAggregator {
     gameBuffer = [];
     process(game) {
+        this.gameBuffer = this.gameBuffer.slice(this.gameBuffer.length - 100, this.gameBuffer.length);
         this.gameBuffer.push(game);
-        this.gameBuffer = this.gameBuffer.slice(0, 100);
         //Devlog.process(game);
     }
     getMetrixStats() {
