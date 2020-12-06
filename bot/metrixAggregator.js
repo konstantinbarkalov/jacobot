@@ -2,7 +2,7 @@
 class MetrixAggregator {
     gameBuffer = [];
     process(game) {
-        this.gameBuffer = this.gameBuffer.slice(this.gameBuffer.length - 100, this.gameBuffer.length);
+        this.gameBuffer = this.gameBuffer.slice(-500);
         this.gameBuffer.push(game);
         //Devlog.process(game);
     }

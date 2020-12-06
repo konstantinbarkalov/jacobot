@@ -35,7 +35,23 @@ class Game {
                 this.players.push(player);
             };
             const fragmentText = messageTokens[0];
-            return this.onAction(fragmentText, player);
+            const validActionRegexp = /^[а-яА-ЯёЁ]+$/;
+            const isValidAction = validActionRegexp.test(fragmentText);
+            if (isValidAction) {
+                return this.onAction(fragmentText, player);
+            } else {
+                const invalidActionEnglishRegexp = /[a-zA-Z]/;
+                const invalidActionDigitsRegexp = /[0-9]/;
+                const isInvalidActionEnglish = invalidActionEnglishRegexp.test(fragmentText);
+                const isInvalidActionDigits = invalidActionDigitsRegexp.test(fragmentText);
+                if (isInvalidActionEnglish) {
+                    return new MiscOutputMessage(this, 'Пожалуйста, смени раскладку. А то там у тебя там латинские буквы, а я на Лермонтове учился...');
+                } else if (isInvalidActionDigits) {
+                    return new MiscOutputMessage(this, 'Боюсь, я пока не знаю ни одной команды с числами внутри. Может это была опечатка? 🤔 /help?');
+                } else {
+                    return new MiscOutputMessage(this, 'Стыдно сказать, но мне не удалось распознать эту команду. 😕 /help?');
+                }
+            }
         } else {
             return new MiscOutputMessage(this, 'Без пробелов, плиз. Я пока ещё не понимаю ни одной команды с пробелом. Прости. ☺️ Может /help?');
         }
