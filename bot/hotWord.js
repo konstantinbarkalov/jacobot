@@ -63,7 +63,8 @@ class HotWord {
     checkGuessHotWord(fragmentText) {
         const wasGuessed = !!this.guessHistory.fragment.every[fragmentText];
         const wasGoodGuessed = !!this.guessHistory.fragment.good[fragmentText];
-        const wasGoodGuessedSubstring = Object.keys(this.guessHistory.fragment.good).some((goodHistoryFragment) => { return goodHistoryFragment.includes(fragmentText) } );
+
+        const wasGoodGuessedSuperstring = Object.keys(this.guessHistory.fragment.good).find((goodHistoryFragment) => { return goodHistoryFragment.includes(fragmentText) } );
 
         const guessedHistoryEvent = (Object.entries(this.guessHistory.fragment.every).find(([goodFragmentText, goodFragmentHistoryEvent]) => { return goodFragmentText === fragmentText; } ) || [])[1];
         const goodGuessedSubstringHistoryEvent = (Object.entries(this.guessHistory.fragment.good).find(([goodFragmentText, goodFragmentHistoryEvent]) => { return goodFragmentText.includes(fragmentText) } ) || [])[1];
@@ -93,7 +94,7 @@ class HotWord {
             fragmentText,
             wasGuessed,
             wasGoodGuessed,
-            wasGoodGuessedSubstring,
+            wasGoodGuessedSuperstring,
             guessedHistoryEvent,
             goodGuessedSubstringHistoryEvent,
             isLetter,

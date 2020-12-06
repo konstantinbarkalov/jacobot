@@ -284,16 +284,11 @@ class Game {
                 }
             } else {
                 // CASE: несловарный фрагмент (не буква), новых букв не угадано
-                if (checkGuessResult.hotWord.wasGoodGuessedSubstring) {
+                if (checkGuessResult.hotWord.wasGoodGuessedSuperstring) {
                     // CASE: несловарный фрагмент (не буква), новых букв не угадано, уже угадывали раньше фрагмент, в котором этот есть целиком
-                    if (!checkGuessResult.hotWord.wasGoodGuessedSubstring.toUpperCase) {
-                        console.warn('WTFWTFWTF!!!! no checkGuessResult.hotWord.wasGoodGuessedSubstring.toUpperCase, ', checkGuessResult.hotWord.wasGoodGuessedSubstring);
-                        phrase = `случилась какая-то фигня, если честно и я сломался. пожалуйста, перезапустите сессию, и если не работает дайте плиз знать на mail@barkalov.ru`;
-                    } else {
-                        phrase = `✴️ к сожалению, новых букв не угадано. Обратите внимание, что ✳️ «<b>${upcasedFragmentText}</b>» содержится в "${checkGuessResult.hotWord.wasGoodGuessedSubstring.toUpperCase()}", это ранее уже угадывали`;
-                    }
+                    phrase = `✴️ к сожалению, новых букв не угадано. Обратите внимание, что ✳️ «<b>${upcasedFragmentText}</b>» содержится в "${checkGuessResult.hotWord.wasGoodGuessedSuperstring.toUpperCase()}", а это ранее уже угадывали.`;
                 } else {
-                    phrase = `✴️ несловарный фрагмент «<b>${upcasedFragmentText}</b>», ни одной буквы не угадано`;
+                    phrase = `✴️ несловарный фрагмент «<b>${upcasedFragmentText}</b>», ни одной буквы не угадано.`;
                 }
             }
         }
