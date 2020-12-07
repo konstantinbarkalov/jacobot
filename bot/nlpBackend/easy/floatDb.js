@@ -25,9 +25,9 @@ class FloatDb {
         }
         this.vocabularyDim = Math.min(dataVocabularyDim, this.maxVocabularyDim);
         if (dataVocabularyDim > this.maxVocabularyDim) {
-            console.log(`dataDim ${dataVocabularyDim} is bigger then maxVocabularyDim ${this.maxVocabularyDim}, so clipping to ${this.vocabularyDim}`);
+            console.log(`dataVocabularyDim ${dataVocabularyDim} is bigger then maxVocabularyDim ${this.maxVocabularyDim}, so clipping to ${this.vocabularyDim}`);
         } else {
-            console.log(`dataDim ${dataVocabularyDim} is not bigger then maxVocabularyDim ${this.maxVocabularyDim}, so no clipping`);
+            console.log(`dataVocabularyDim ${dataVocabularyDim} is not bigger then maxVocabularyDim ${this.maxVocabularyDim}, so no clipping`);
         }
 
         const capedVocabularyDim = Math.min(dataVocabularyDim, this.maxVocabularyDim);
@@ -35,7 +35,7 @@ class FloatDb {
         const fullData = new Float32Array(dataBuffer.buffer, dataBuffer.offset, capedDataPlainDim);
 
         this.data = fullData.slice(0, capedDataPlainDim);
-        this.taggedLemmas = fullTaggedLemmas.slice(0, capedDataPlainDim);
+        this.taggedLemmas = fullTaggedLemmas.slice(0, capedVocabularyDim);
 
         console.log('Loading floatDb data done.');
     }
