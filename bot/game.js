@@ -30,6 +30,7 @@ class Game {
             if (!player) {
                 player = {
                     score: 0,
+                    streak: 0,
                     gameUser
                 }
                 this.players.push(player);
@@ -63,7 +64,13 @@ class Game {
         const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity);
         const referateText = PhraseBuilder.phrasesToText(referatePhrases);
         const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity);
-        player.score+= scoreGainSum;
+        player.score += scoreGainSum;
+
+        if (Math.sign(player.streak) !== Math.sign(scoreGainSum)) {
+            player.streak = 0;
+        } else {
+            player.streak += Math.sign(scoreGainSum);
+        }
 
         let answerText = '';
         answerText += referateText;
@@ -158,6 +165,7 @@ class Game {
     }
 
     referateAction(checkGuessResult, stat, player, fragmentText, proximity) {
+        const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
         const proximityPercent = (proximity * 100).toFixed() + '%';
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
@@ -179,63 +187,81 @@ class Game {
                 } else {
                     phrase = `❇️ доооохера букв «<b>${upcasedFragmentText}</b>» в слове!!!!!`;
                 }
-            } else {
-                if (checkGuessResult.topSimonym.isRobustGuess) {
-                    // CASE: топ-слово угадано и оно внутри загаданного
+            } else if (checkGuessResult.hotWord.isEquallyHotWord) {
+                phrase = `✳️ Точно. Чётко. Безупречно. Правильный ответ и ${justGuessedHotWordLettersCount} открытых букв!`;
+            } else if (checkGuessResult.hotWord.isEquallyHotLemma) {
+                if (stat.hotWord.unguessedLetters.length === 0) {
+                    phrase = `🈯️+✳️ Вы назвали лемму и открыли главное слово! Звучит как ошибка, ей-богу, но ${justGuessedHotWordLettersCount} открытых букв и слово полностью разгадано.`;
+                } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
+                    phrase = `🈯️+✳️ Вы назвали неточную форму, но это засчитывается как победа! ${justGuessedHotWordLettersCount} открытых букв.`;
+                } else {
+                    phrase = `🈯️+✳️ ОЧЕНЬ БЛИЗКО! ${justGuessedHotWordLettersCount} открытых букв.`;
+                }
+            } else if (checkGuessResult.topSimonym.isRobustGuess) {
+                // CASE: топ-слово угадано и оно внутри загаданного
+                if (stat.hotWord.unguessedLetters.length === 0) {
+                    phrase = `✳️+#️⃣ это комбо!! Открыто близкое слово номер #️⃣ ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} (его близость к загаданному ${proximityPercent} ). И одновременно разгадано главное слово. ${justGuessedHotWordLettersCount} открытых букв!`;
+                } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
+                    phrase = `✳️+#️⃣ кажется, у нас произошла забавная ситуация!! Вы открыли близкое слово номер #️⃣ ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} (его близость к загаданному ${proximityPercent} ). А ещё ${justGuessedHotWordLettersCount} букв! 🤩`;
+                } else {
                     phrase = `✳️+#️⃣ просто вау!!! Смотрите, что произошло. Открыто близкое слово номер #️⃣ ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} (его близость к загаданному ${proximityPercent} ). Это во-первых. Во-вторых, это слово ✳️ «<b>${upcasedFragmentText}</b>» само по себе целиком содержится в загаданом. Таким образом, всего мы открываем ${justGuessedHotWordLettersCount} букв в слове, и слово № ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} из топа! Браво!`;
-                } else if (isKnownWord) {
-                    // CASE: слово-фрагмент внутри загаданного угадан
-                    if (isBigWord) {
-                        // CASE: большое (неполезное как близкое) слово внутри загаданного угадан
-                        if (checkGuessResult.topSimonym.wasTopGuess) {
-                            // CASE: большое (неполезное как близкое) слово внутри загаданного угадано, было раньше открыто в топе
-                            phrase = `✳️ Ха, слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто, забавно! Это слово, кстати № #️⃣ ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} в топе близких слов, но мы его уже открыли до этого. (близость ${proximityPercent}).`;
-                        } else if (checkGuessResult.topSimonym.wasGuessed) {
-                            // CASE: большое (неполезное как близкое) слово внутри загаданного угадан, слово не из топа, уже называли
-                            phrase = `✳️ Вот это ситация! Мы уже открывали слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто, забавно. Причем, его близость всего-то ${proximityPercent}.`;
-                        } else {
-                            // CASE: большое (неполезное как близкое) слово внутри загаданного угадано, слово не из топа, ещё не называли
-                            phrase = `🈳/✳️ Слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}.`;
-                        }
+                }
+            } else if (isKnownWord) {
+                // CASE: слово-фрагмент внутри загаданного угадан
+                if (isBigWord) {
+                    // CASE: большое (неполезное как близкое) слово внутри загаданного угадан
+                    if (stat.hotWord.unguessedLetters.length === 0) {
+                        phrase = `🈳/✳️ Слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}.`;
+                    } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
+                        phrase = `✳️+#️⃣ кажется, у нас произошла забавная ситуация!! Вы открыли близкое слово номер #️⃣ ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} (его близость к загаданному ${proximityPercent} ). А ещё ${justGuessedHotWordLettersCount} букв! 🤩`;
+                    } else if (checkGuessResult.topSimonym.wasTopGuess) {
+                        // CASE: большое (неполезное как близкое) слово внутри загаданного угадано, было раньше открыто в топе
+                        phrase = `✳️ Ха, слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто, забавно! Это слово, кстати № #️⃣ ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} в топе близких слов, но мы его уже открыли до этого. (близость ${proximityPercent}).`;
+                    } else if (checkGuessResult.topSimonym.wasGuessed) {
+                        // CASE: большое (неполезное как близкое) слово внутри загаданного угадан, слово не из топа, уже называли
+                        phrase = `✳️ Вот это ситация! Мы уже открывали слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто, забавно. Причем, его близость всего-то ${proximityPercent}.`;
                     } else {
-                        // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано
-                        if (checkGuessResult.topSimonym.wasTopGuess) {
-                            // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано, был раньше открыт в топе
-                            phrase = `✳️ Хмм! «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Это, кстати, ещё и слово №${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} в топе близких слов, но мы его уже открыли ранее. (близость ${proximityPercent}).`;
-                        } else if (checkGuessResult.topSimonym.wasGuessed) {
-                            // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано, слово не из топа, уже называли
-                            phrase = `✳️ Ха, «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто, забавно. Это, кстати, ещё и слово, причем, его близость к загаданному всего-то ${proximityPercent}.`;
-                        } else {
-                            // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано, слово не из топа, ещё не называли
-                            phrase = `🈳/✳️ Слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}.`;
-                        }
+                        // CASE: большое (неполезное как близкое) слово внутри загаданного угадано, слово не из топа, ещё не называли
+                        phrase = `🈳/✳️ Слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}.`;
                     }
                 } else {
-                    // CASE: фрагмент внутри загаданного слова угадан
-                    if (justGuessedHotWordUniqueLettersCount > 4) {
-                        // CASE: фрагмент внутри загаданного слова угадан, больше 4 уникальных букв
-                        phrase = `✳️ бууум! фрагмент «<b>${upcasedFragmentText}</b>» внутри загаданного слова угадан, сразу ${justGuessedHotWordLettersCount} буквы открыто!`;
-                    } else if (justGuessedHotWordUniqueLettersCount > 1) {
-                        // CASE: фрагмент внутри загаданного слова угадан, больше 1 уникальной буквы
-                        const lettersWithoutLast = justGuessedHotWordUniqueLetters.slice(0, justGuessedHotWordUniqueLetters.length - 1);
-                        const lastLetterText = '"' + justGuessedHotWordUniqueLetters[justGuessedHotWordUniqueLetters.length - 1].toUpperCase() + '"';
-                        const lettersWithoutLastText = lettersWithoutLast.map(letter => `"${letter.toUpperCase()}"`).join(', ');
-                        const lettersText = lettersWithoutLastText + ' и ' + lastLetterText;
-                        phrase = `✳️ поздравляю! Фрагмент «<b>${upcasedFragmentText}</b>» внутри загаданного слова угадан, открываем буквы ❇️ ${lettersText}. ${justGuessedHotWordLettersCount} буквы в загаданном слове открыто!`;
-                    } else if (justGuessedHotWordUniqueLettersCount === 1) {
-                        // CASE: фрагмент внутри загаданного слова угадан, открыта 1 уникальная буква
-                        const uniqueLetter = justGuessedHotWordUniqueLetters[0];
-                        if (justGuessedHotWordLettersCount === 1) {
-                            // CASE: фрагмент внутри загаданного слова угадан, открыта 1 буква
-                            phrase = `✳️/❇️ из названного фрагмента «<b>${upcasedFragmentText}</b>» в загаданном слове можно открыть только одну букву ❇️ "${uniqueLetter}". Довольно рисковнанный поступок.`;
-                        } else {
-                            // CASE: фрагмент внутри загаданного слова угадан, открыта 1 уникальная буква несколько раз
-                            phrase = `✳️/❇️ поздравляю! Из всего «<b>${upcasedFragmentText}</b>» мы открываем букву ❇️ ${uniqueLetter}, но зато ${justGuessedHotWordLettersCount} раз! Ловко!`;
-                        }
+                    // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано
+                    if (checkGuessResult.topSimonym.wasTopGuess) {
+                        // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано, был раньше открыт в топе
+                        phrase = `✳️ Хмм! «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Это, кстати, ещё и слово №${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} в топе близких слов, но мы его уже открыли ранее. (близость ${proximityPercent}).`;
+                    } else if (checkGuessResult.topSimonym.wasGuessed) {
+                        // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано, слово не из топа, уже называли
+                        phrase = `✳️ Ха, «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто, забавно. Это, кстати, ещё и слово, причем, его близость к загаданному всего-то ${proximityPercent}.`;
                     } else {
-                        // CASE: фрагмент внутри загаданного слова угадан, а уникальных букв 0
-                        throw new Error('CASE: фрагмент внутри загаданного слова угадан, а уникальных букв 0');
+                        // CASE: небольшое (неполезное как близкое) слово-фрагмент внутри загаданного угадано, слово не из топа, ещё не называли
+                        phrase = `🈳/✳️ Слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}.`;
                     }
+                }
+            } else {
+                // CASE: фрагмент внутри загаданного слова угадан
+                if (justGuessedHotWordUniqueLettersCount > 4) {
+                    // CASE: фрагмент внутри загаданного слова угадан, больше 4 уникальных букв
+                    phrase = `✳️ бууум! фрагмент «<b>${upcasedFragmentText}</b>» внутри загаданного слова угадан, сразу ${justGuessedHotWordLettersCount} буквы открыто!`;
+                } else if (justGuessedHotWordUniqueLettersCount > 1) {
+                    // CASE: фрагмент внутри загаданного слова угадан, больше 1 уникальной буквы
+                    const lettersWithoutLast = justGuessedHotWordUniqueLetters.slice(0, justGuessedHotWordUniqueLetters.length - 1);
+                    const lastLetterText = '"' + justGuessedHotWordUniqueLetters[justGuessedHotWordUniqueLetters.length - 1].toUpperCase() + '"';
+                    const lettersWithoutLastText = lettersWithoutLast.map(letter => `"${letter.toUpperCase()}"`).join(', ');
+                    const lettersText = lettersWithoutLastText + ' и ' + lastLetterText;
+                    phrase = `✳️ поздравляю! Фрагмент «<b>${upcasedFragmentText}</b>» внутри загаданного слова угадан, открываем буквы ❇️ ${lettersText}. ${justGuessedHotWordLettersCount} буквы в загаданном слове открыто!`;
+                } else if (justGuessedHotWordUniqueLettersCount === 1) {
+                    // CASE: фрагмент внутри загаданного слова угадан, открыта 1 уникальная буква
+                    const uniqueLetter = justGuessedHotWordUniqueLetters[0];
+                    if (justGuessedHotWordLettersCount === 1) {
+                        // CASE: фрагмент внутри загаданного слова угадан, открыта 1 буква
+                        phrase = `✳️/❇️ из названного фрагмента «<b>${upcasedFragmentText}</b>» в загаданном слове можно открыть только одну букву ❇️ "${uniqueLetter}". Довольно рисковнанный поступок.`;
+                    } else {
+                        // CASE: фрагмент внутри загаданного слова угадан, открыта 1 уникальная буква несколько раз
+                        phrase = `✳️/❇️ поздравляю! Из всего «<b>${upcasedFragmentText}</b>» мы открываем букву ❇️ ${uniqueLetter}, но зато ${justGuessedHotWordLettersCount} раз! Ловко!`;
+                    }
+                } else {
+                    // CASE: фрагмент внутри загаданного слова угадан, а уникальных букв 0
+                    throw new Error('CASE: фрагмент внутри загаданного слова угадан, а уникальных букв 0');
                 }
             }
         } else if (checkGuessResult.topSimonym.isRobustGuess) {
@@ -311,7 +337,7 @@ class Game {
         let postPhrase = '';
         if (stat.hotWord.unguessedLetters.length === 0) {
             postPhrase = `\n✅ ВЫ ПОЛНОСТЬЮ УГАДАЛИ СЛОВО! «<b>${this.hotWord.wordText.toUpperCase()}</b>», УРА!`;
-        } else if (stat.hotWord.unguessedLetters.length < 3) {
+        } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
             postPhrase = `\n✅ осталось всего ${stat.hotWord.unguessedLetters.length} букв, а значит по правилам слово «<b>${this.hotWord.wordText.toUpperCase()}</b>» раскрыто! Это победа!`;
         }
         const phrases = [phrase, postPhrase];
@@ -319,6 +345,7 @@ class Game {
     }
     referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity) {
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
+        const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
         let scoreGains = [];
         if (checkGuessResult.topSimonym.isRobustGuess) {
             const scoreGainValue = 250 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
@@ -388,7 +415,7 @@ class Game {
                 isFinal: true,
             }
             scoreGains.push(scoreGain);
-        } else if (stat.hotWord.unguessedLetters.length < 3) {
+        } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
             const scoreGainValue = 500;
             const scoreGain = {
                 subject: 'слово почти полностью',
@@ -398,7 +425,7 @@ class Game {
             }
             scoreGains.push(scoreGain);
         }
-        if (stat.hotWord.unguessedLetters.length < 3 && this.stepNum < 10) {
+        if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin && this.stepNum < 10) {
             const scoreGainValue = 3000 / (this.stepNum + 1);
             const scoreGain = {
                 subject: 'быстрая победа',
@@ -408,7 +435,31 @@ class Game {
             }
             scoreGains.push(scoreGain);
         }
-
+        if (player.streak > 5) {
+            const scoreGainValue = -1000;
+            const scoreGain = {
+                subject: 'штраф за жадность',
+                value: scoreGainValue,
+                congratz: -1,
+            }
+            scoreGains.push(scoreGain);
+        } if (player.streak > 0) {
+            const scoreGainValue = 100 * Math.min(player.streak, 5);
+            const scoreGain = {
+                subject: 'серия побед',
+                value: scoreGainValue,
+                congratz: 4,
+            }
+            scoreGains.push(scoreGain);
+        } else if (player.streak < -2) {
+            const scoreGainValue = -75;
+            const scoreGain = {
+                subject: 'серия неудач',
+                value: scoreGainValue,
+                congratz: 4,
+            }
+            scoreGains.push(scoreGain);
+        }
         const initialReferateResult = {scoreGainTextLines: [], scoreGainSum: 0, congratzMax: -Infinity, isFinal: false};
         if (scoreGains.length > 0) {
             const referateResult = scoreGains.reduce((referateResult, scoreGain) => {
@@ -481,15 +532,6 @@ class Game {
             }
         });
         return lines.join('\n');
-        //const rowsCount = Math.floor(lines.length / 2);
-        //let rowLines = [];
-        //for (let r = 0; r < rowsCount; r++) {
-        //    const sinonymLineA = lines[r];
-        //    const sinonymLineB = lines[r + rowsCount];
-        //    const rowLine = sinonymLineA.padEnd(50) + sinonymLineB;
-        //    rowLines.push(rowLine);
-        //}
-        //return rowLines.join('\n');
     }
     getCurrentStateText() {
         const maskedWord = this.isDone ? this.hotWord.wordText.toUpperCase() : this.hotWord.getMasked();

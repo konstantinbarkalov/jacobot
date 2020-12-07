@@ -12,7 +12,7 @@ echo ------
 echo installing bot
 cd bot
 npm install
-npm install -g forever
+sudo npm install -g forever
 
 cd ..
 
