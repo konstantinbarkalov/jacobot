@@ -7,11 +7,11 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch hotWord.js",
+            "name": "Launch plainTxtToFloatDb.js",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\hotWord.js"
+            "program": "${workspaceFolder}\\nlpBackend\\easy\\plainTxtToFloatDb.js"
         },
         {
             "type": "node",
