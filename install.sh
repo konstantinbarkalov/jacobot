@@ -19,7 +19,7 @@ cd ..
 echo ------
 echo converting text to floatDb
 cd devUtils/plainTxtToFloatDb
-node convert.js
+node --max-old-space-size=2048 convert.js
 
 cd ..
 cd ..

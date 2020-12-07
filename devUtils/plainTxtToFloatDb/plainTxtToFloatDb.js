@@ -2,7 +2,7 @@ const fs = require('fs');
 const ReadByLine = require('./readByLine');
 class PlainTxtToFloatDb {
     expectedVectorDim = 300;
-    maxVocobularyDim = 300000;
+    maxVocobularyDim = 200000;
     floatDb = null;
     lastLogTimestamp = 0;
     loggingTrottleDelay = 1000;
