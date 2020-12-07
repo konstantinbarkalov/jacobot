@@ -28,19 +28,29 @@ class GameMaster {
         this.metrixAggregator.process(game);
     }
     onAbout() {
-        //return new MiscOutputMessage(null, aboutText);
-        const liveAboutHtml = fs.readFileSync('./about.html',{encoding: 'utf8'});
-        return new MiscOutputMessage(null, liveAboutHtml);
+        return new MiscOutputMessage(null, aboutText);
+        //const liveAboutHtml = fs.readFileSync('./about.html',{encoding: 'utf8'});
+        //return new MiscOutputMessage(null, liveAboutHtml);
     }
     onRules() {
-        //return new MiscOutputMessage(null, rulesText);
-        const liveRulesHtml = fs.readFileSync('./rules.html',{encoding: 'utf8'});
-        return new MiscOutputMessage(null, liveRulesHtml);
+        return new MiscOutputMessage(null, rulesText);
+        //const liveRulesHtml = fs.readFileSync('./rules.html',{encoding: 'utf8'});
+        //return new MiscOutputMessage(null, liveRulesHtml);
     }
     onHelp() {
-        //return new MiscOutputMessage(null, helpText);
-        const liveHelpHtml = fs.readFileSync('./help.html',{encoding: 'utf8'});
-        return new MiscOutputMessage(null, liveHelpHtml);
+        return new MiscOutputMessage(null, helpText);
+        //const liveHelpHtml = fs.readFileSync('./help.html',{encoding: 'utf8'});
+        //return new MiscOutputMessage(null, liveHelpHtml);
+    }
+    onDebug(ctx) {
+        const debugMessage = {
+            message: ctx.message,
+            memoryUsage: Object.fromEntries(Object.entries(process.memoryUsage()).map(([key, value])=> {
+                return [key, (value / 1024 / 1024).toFixed(0) + 'Mb'];
+            })),
+        }
+        const debugMessageJson = JSON.stringify(debugMessage, null, 4);
+        return new MiscOutputMessage(null, debugMessageJson);
     }
     onMetrix() {
         const metrixStats = this.metrixAggregator.getMetrixStats();

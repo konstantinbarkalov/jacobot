@@ -50,7 +50,8 @@ function onMetrix(ctx) {
     ctx.reply(metixHtml.answer, {parse_mode: 'HTML', disable_web_page_preview: true});
 }
 function onDebug(ctx) {
-    ctx.reply(JSON.stringify(ctx.message, null, 4));
+    const debugHtml = gameMaster.onDebug(ctx);
+    ctx.reply(debugHtml.answer, {parse_mode: 'HTML', disable_web_page_preview: true});
 }
 
 // gameMaster driven commands

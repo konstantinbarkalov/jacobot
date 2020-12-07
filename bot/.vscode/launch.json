@@ -7,11 +7,12 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch plainTxtToFloatDb.js",
+            "name": "Launch plainTxtToFloatDb\\convert.js",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\nlpBackend\\easy\\plainTxtToFloatDb.js"
+            "program": "${workspaceFolder}\\..\\devUtils\\plainTxtToFloatDb\\convert.js",
+            "cwd": "${workspaceFolder}\\..\\devUtils\\plainTxtToFloatDb"
         },
         {
             "type": "node",

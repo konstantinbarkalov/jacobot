@@ -3,16 +3,18 @@ const ReadByLine = require('./readByLine');
 class PlainTxtToFloatDb {
     expectedVectorDim = 300;
     maxVocobularyDim = 200000;
-    floatDb = null;
+    data = null;
     lastLogTimestamp = 0;
     loggingTrottleDelay = 1000;
     modelTextFilePath = '../../data/w2v/model.txt';
-    modelFloatDbFilePath = '../../data/w2v/model.fdb';
+    modelFloatDbDataFilePath = '../../data/w2v/model.fdb.data';
     modelFloatDbTaggedLemmasFilePath = '../../data/w2v/model.fdb.tl';
     loadFromTxt() {
         const rbl = new ReadByLine();
         return rbl;
     }
+
+
     async convert() {
         console.log(`begin converting ${this.modelTextFilePath} text file...`);
         const rbl = this.loadFromTxt();
@@ -20,23 +22,28 @@ class PlainTxtToFloatDb {
         const linesCount = await rbl.processByLine(this.modelTextFilePath, this.maxVocobularyDim + 1, (line, lineIdx) => {this. onTxtLine(line, lineIdx)});
         console.log(`convering ${linesCount} text lines done.`);
         this.logMemUsage();
+        console.log(`saving...`);
         this.saveToFloatDb();
+        console.log(`saving done.`);
+        console.log(`reloading...`);
+        this.loadFromFloatDbFiles();
+        console.log(`reloading done`);
     }
     saveToFloatDb() {
-        const floatDbBuffer = Buffer.from(this.floatDb.buffer)
-        fs.writeFileSync(this.modelFloatDbFilePath, floatDbBuffer);
+        const dataBuffer = Buffer.from(this.data.buffer)
+        fs.writeFileSync(this.modelFloatDbDataFilePath, dataBuffer);
         const taggedLemmasBuffer = this.taggedLemmas.join('\n');
         fs.writeFileSync(this.modelFloatDbTaggedLemmasFilePath, taggedLemmasBuffer);
     }
-    loadFromFloatDb() {
-        const floatDbBuffer = fs.readFileSync(this.modelFloatDbFilePath);
-        this.floatDb = new Float32Array(floatDbBuffer);
-        const taggedLemmasBuffer = fs.readFileSync(this.modelFloatDbFilePath);
-        this.taggedLemmas = taggedLemmasBuffer.split('\n');
+    loadFromFloatDbFiles() {
+        const dataBuffer = fs.readFileSync(this.modelFloatDbDataFilePath,{ encoding: null});
+        this.data = new Float32Array(dataBuffer.buffer, dataBuffer.offset, dataBuffer.byteLength / 4);
+        const taggedLemmasText = fs.readFileSync(this.modelFloatDbTaggedLemmasFilePath, {encoding: 'utf8'});
+        this.taggedLemmas = taggedLemmasText.split('\n');
     }
 
     onTxtLine(line, lineIdx) {
-        const isFirstLine = lineIdx === 0;
+        const isFirstLine = (lineIdx === 0);
         if (isFirstLine) {
             this.onFirstTxtLine(line);
         } else {
@@ -53,7 +60,7 @@ class PlainTxtToFloatDb {
             throw new Error(`Wrong header vector dim, expected: ${this.expectedVectorDim}, got: ${headerVectorDim}`)
         }
         console.log(`creating floatDb with vocabulary dim: ${vocabularyDim} (max is: ${this.maxVocobularyDim}, header is: ${headerVocabularyDim}) and vectorDim: ${this.expectedVectorDim}`);
-        this.floatDb = new Float32Array(vocabularyDim * this.expectedVectorDim);
+        this.data = new Float32Array(vocabularyDim * this.expectedVectorDim);
         this.taggedLemmas = new Array(vocabularyDim);
         console.log(`empty floatDb created`);
         this.logMemUsage();
@@ -71,7 +78,7 @@ class PlainTxtToFloatDb {
         tokens.forEach((token, tokenIdx) => {
             const floatDbIdx = dataLineIdx * this.expectedVectorDim + tokenIdx;
             const floatValue = parseFloat(token);
-            this.floatDb[floatDbIdx] = floatValue;
+            this.data[floatDbIdx] = floatValue;
         });
         this.taggedLemmas[dataLineIdx] = taggedLemma;
     }

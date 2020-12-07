@@ -1,6 +1,6 @@
-const PlainTxtToFloatD = require('./plainTxtToFloatDb.js');
+const PlainTxtToFloatDb = require('./plainTxtToFloatDb.js');
 async function runConvert() {
-    const converter = new PlainTxtToFloatD();
+    const converter = new PlainTxtToFloatDb();
     await converter.convert();
     console.log('fin');
 }

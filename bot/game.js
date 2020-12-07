@@ -471,8 +471,8 @@ class Game {
             }
             const tag = topSimonym.smartVectorRecord.tag;
             const proximityPercent = (topSimonym.proximity * 100).toFixed()+'%';
-            const rank = topSimonym.smartVectorRecord.rank;
-            const rankCategory = (rank > 60000) ? 'редк.' : '';
+            const rank = topSimonym.smartVectorRecord.vocabularyIdx;
+            const rankCategory = (rank > 80000) ? 'редк.' : '';
             //const line = `#${idx + 1}: ${lemma} ${tag} ${proximityPercent} R${rankCategory}`;
             const line = `#${idx + 1}: ${lemma} ${proximityPercent} ${rankCategory}`;
 
