@@ -5,6 +5,8 @@ const HotWord = require('./hotWord.js');
 const MiscOutputMessage = require('./miscOutputMessage.js');
 const PhraseBuilder = require('./phraseBuilder.js');
 
+const rareRankThreshold = 70000;
+const topSimonymRankThreshold = 100000;
 class Game {
     stepNum = 0;
     jacoGameUser = new GameUser('never', 'Яков', 'male');
@@ -61,9 +63,10 @@ class Game {
         const checkGuessResult = this.hotWord.guess(fragmentText, player);
         const stat = this.hotWord.getStat();
         const proximity = this.gameMaster.nlpBackend.getProximity(this.hotWord.lemmaText, fragmentText);
-        const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity);
+        const rank = this.gameMaster.nlpBackend.getRank(fragmentText);
+        const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank);
         const referateText = PhraseBuilder.phrasesToText(referatePhrases);
-        const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity);
+        const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank);
         player.score += scoreGainSum;
 
         if (Math.sign(player.streak) !== Math.sign(scoreGainSum)) {
@@ -142,9 +145,24 @@ class Game {
         const hotWordLemma = randomCitation.hotChunk.lemma.toLowerCase();
         const hotWordTag = randomCitation.hotChunk.tag;
 
-        this.topSimonyms = this.gameMaster.nlpBackend.getSimilar(hotWordLemma, 20, 80000, hotWordTag);
+        this.topSimonyms = this.gameMaster.nlpBackend.getSimilar(hotWordLemma, 20, topSimonymRankThreshold, hotWordTag);
         const topSimonymTexts = this.topSimonyms.map(topSimonym => topSimonym.smartVectorRecord.lemma);
+
+
+
         this.hotWord = new HotWord(hotWordText, hotWordLemma, topSimonymTexts);
+
+        ////////
+        const a = this.gameMaster.nlpBackend.getSimilar(hotWordLemma, 20, 10000000000, hotWordTag);;
+        console.log('------');
+        console.log(this.hotWord.lemmaText, this.hotWord.wordText);
+        console.log('------');
+        console.log(a[0]);
+        console.log(a[1]);
+        console.log(a[2]);
+        console.log(a[3]);
+        console.log(a[4]);
+        //////////
 
         this.startTimestamp = Date.now();
         for (let i = 1; i < 5; i++) {
@@ -164,11 +182,17 @@ class Game {
         this.gameMaster.removeActiveGame(this);
     }
 
-    referateAction(checkGuessResult, stat, player, fragmentText, proximity) {
+    referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank) {
         const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
         const proximityPercent = (proximity * 100).toFixed() + '%';
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
+        const isRareWord = rank > rareRankThreshold;
+        const isToRareToBeInTop = rank > topSimonymRankThreshold;
+        const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].proximity;
+        const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
+        const isHiddenTopSimonymJustGuessed = isToRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
+
         const upcasedFragmentText = fragmentText.toUpperCase();
         let phrase;
         if (checkGuessResult.hotWord.isRobustGuess) {
@@ -208,7 +232,9 @@ class Game {
                 }
             } else if (isKnownWord) {
                 // CASE: слово-фрагмент внутри загаданного угадан
-                if (isBigWord) {
+                if (isHiddenTopSimonymJustGuessed) {
+                    phrase = `🈳+✳️ У нас случилось очередное удивительное. Смотрите! Редкое слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}. Это редкое (низкочастотное) слово, и у нейросети есть сомнения: вообще слово ли это. Так что такие слова не попадают в топ близких слов, чтобы не усложнять жизнь игрокам. Но вы его назвали сами. И оно "есть" в топе. Это заслуживает отдельный приз!`;
+                } else if (isBigWord) {
                     // CASE: большое (неполезное как близкое) слово внутри загаданного угадан
                     if (stat.hotWord.unguessedLetters.length === 0) {
                         phrase = `🈳/✳️ Слово «<b>${upcasedFragmentText}</b>» целиком содержится в загаданном, ${justGuessedHotWordLettersCount} буквы открыто. Причем, его близость ${proximityPercent}.`;
@@ -269,7 +295,19 @@ class Game {
             phrase = `#️⃣ близкое слово номер ${checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1} угадано, отлично! Его близость к загаданному ${proximityPercent}.`;
         } else if (isKnownWord) {
             // CASE: (неполезное) словарное слово
-            if (isBigWord) {
+            if (checkGuessResult.hotWord.isEquallyHotLemma) {
+                if (checkGuessResult.hotWord.wasGuessed) {
+                    phrase = `🈯️ ОЧЕНЬ БЛИЗКО! Ай-яй-яй.`;
+                } else {
+                    phrase = `Вы уже называли это слово, ну же! Это почти верный ответ. Совсем рядом!`;
+                }
+            } else if (isHiddenTopSimonymJustGuessed) {
+                if (checkGuessResult.hotWord.wasGuessed) {
+                    phrase = `Это редкое "скрытое" топ-слово вы уже называли: его близость к загаданному ${proximityPercent}!`;
+                } else {
+                    phrase = `🈳 Оппа! Редкое слово «<b>${upcasedFragmentText}</b>». Настолько низкочастотное и подозрительное, что нейросеть не стала добавлять его в топ. А ведь это слово там должно было быть: его близость к загаданному ${proximityPercent}! Вы открыли "скрытое" слово в топе, за это положены дополнительные очки, поздравляю!`;
+                }
+            } else if (isBigWord) {
                 // CASE: (неполезное) словарное большое слово
                 if (checkGuessResult.hotWord.wasGuessed) {
                     // CASE: такое больше (неполезное) слово в словаре есть, но его называли
@@ -343,39 +381,119 @@ class Game {
         const phrases = [phrase, postPhrase];
         return phrases;
     }
-    referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity) {
-        const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
+    referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank) {
         const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
+        const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
+        const isBigWord = fragmentText.length > 4;
+        const isRareWord = rank > rareRankThreshold;
+        const isToRareToBeInTop = rank > topSimonymRankThreshold;
+        const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].proximity;
+        const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
+        const isHiddenTopSimonymJustGuessed = isToRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
+
         let scoreGains = [];
         if (checkGuessResult.topSimonym.isRobustGuess) {
-            const scoreGainValue = 250 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
-            const scoreGain = {
-                subject: 'близкое топ-слово',
-                value: scoreGainValue,
-                congratz: 1,
-            }
-            scoreGains.push(scoreGain);
-        }
-
-        if (checkGuessResult.hotWord.isRobustGuess) {
-
-            if (checkGuessResult.hotWord.isLetter) {
-                const scoreGainValue = 50 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+            if (isRareWord) {
+                const scoreGainValue = 750 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
                 const scoreGain = {
-                    subject: 'буква',
+                    subject: 'редкое близкое топ-слово',
                     value: scoreGainValue,
-                    congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    congratz: 1,
                 }
                 scoreGains.push(scoreGain);
             } else {
-                const scoreGainValue = 50 * checkGuessResult.hotWord.justGuessedHotWordLetters.length * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+                const scoreGainValue = 250 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
                 const scoreGain = {
-                    subject: 'фрагмент',
+                    subject: 'близкое топ-слово',
                     value: scoreGainValue,
-                    congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    congratz: 1,
                 }
                 scoreGains.push(scoreGain);
             }
+        }
+        if (isHiddenTopSimonymJustGuessed) {
+            if (checkGuessResult.hotWord.isRobustGuess) {
+                const scoreGainValue = 5000;
+                const scoreGain = {
+                    subject: 'секретное топ-слово внутри слова',
+                    value: scoreGainValue,
+                    congratz: 1,
+                }
+                scoreGains.push(scoreGain);
+            } else {
+                const scoreGainValue = 1000;
+                const scoreGain = {
+                    subject: 'секретное топ-слово',
+                    value: scoreGainValue,
+                    congratz: 1,
+                }
+                scoreGains.push(scoreGain);
+            }
+        }
+        if (checkGuessResult.hotWord.isRobustGuess) {
+
+            if (checkGuessResult.hotWord.isLetter) {
+                if (fragmentText === 'ъ') {
+                    const scoreGainValue = 666 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+                    const scoreGain = {
+                        subject: 'это знак! (твердый)',
+                        value: scoreGainValue,
+                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    }
+                    scoreGains.push(scoreGain);
+                } else if (fragmentText === 'ь') {
+                    const scoreGainValue = 66 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+                    const scoreGain = {
+                        subject: 'это знак! (мягкий)',
+                        value: scoreGainValue,
+                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    }
+                    scoreGains.push(scoreGain);
+                } else if (fragmentText === 'я') {
+                    const scoreGainValue = 99 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+                    const scoreGain = {
+                        subject: 'любимая буква',
+                        value: scoreGainValue,
+                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    }
+                    scoreGains.push(scoreGain);
+                } else {
+                    const scoreGainValue = 50 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+                    const scoreGain = {
+                        subject: 'буква',
+                        value: scoreGainValue,
+                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    }
+                    scoreGains.push(scoreGain);
+                }
+
+            } else {
+                if (!checkGuessResult.hotWord.isEquallyHotWord && checkGuessResult.hotWord.isEquallyHotLemma) {
+                    const scoreGainValue = 10000;
+                    const scoreGain = {
+                        subject: 'лемма внутри слова',
+                        value: scoreGainValue,
+                        congratz: 6,
+                    }
+                    scoreGains.push(scoreGain);
+                } else {
+                    const scoreGainValue = 50 * checkGuessResult.hotWord.justGuessedHotWordLetters.length * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
+                    const scoreGain = {
+                        subject: 'фрагмент',
+                        value: scoreGainValue,
+                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
+                    }
+                    scoreGains.push(scoreGain);
+                }
+            }
+        } else if (!checkGuessResult.hotWord.isEquallyHotWord && checkGuessResult.hotWord.isEquallyHotLemma  && !checkGuessResult.hotWord.wasGuessed) {
+            const scoreGainValue = 500;
+            const scoreGain = {
+                subject: 'лемма',
+                value: scoreGainValue,
+                congratz: 2,
+            }
+            scoreGains.push(scoreGain);
         }
 
         if (!checkGuessResult.topSimonym.isRobustGuess && !checkGuessResult.hotWord.isRobustGuess) {
@@ -406,25 +524,46 @@ class Game {
             }
         }
 
-        if (stat.hotWord.unguessedLetters.length === 0) {
-            const scoreGainValue = 1000;
-            const scoreGain = {
-                subject: 'слово полностью',
-                value: scoreGainValue,
-                congratz: 5,
-                isFinal: true,
+        if (checkGuessResult.hotWord.isRobustGuess) {
+            if (checkGuessResult.hotWord.isEquallyHotWord) {
+                const scoreGainValue = 2000;
+                const scoreGain = {
+                    subject: 'слово названо точно',
+                    value: scoreGainValue,
+                    congratz: 5,
+                    isFinal: true,
+                }
+                scoreGains.push(scoreGain);
+            } else if (stat.hotWord.unguessedLetters.length === 0) {
+                const scoreGainValue = 1000;
+                const scoreGain = {
+                    subject: 'слово раскрыто полностью',
+                    value: scoreGainValue,
+                    congratz: 5,
+                    isFinal: true,
+                }
+                scoreGains.push(scoreGain);
+            } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
+                const scoreGainValue = 500;
+                const scoreGain = {
+                    subject: 'слово раскрыто почти полностью',
+                    value: scoreGainValue,
+                    congratz: 4,
+                    isFinal: true,
+                }
+                scoreGains.push(scoreGain);
             }
-            scoreGains.push(scoreGain);
         } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
-            const scoreGainValue = 500;
+            const scoreGainValue = 1;
             const scoreGain = {
-                subject: 'слово почти полностью',
+                subject: 'слово мучительно выпытано',
                 value: scoreGainValue,
-                congratz: 4,
+                congratz: 0,
                 isFinal: true,
             }
             scoreGains.push(scoreGain);
         }
+
         if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin && this.stepNum < 10) {
             const scoreGainValue = 3000 / (this.stepNum + 1);
             const scoreGain = {
@@ -435,15 +574,31 @@ class Game {
             }
             scoreGains.push(scoreGain);
         }
-        if (player.streak > 5) {
-            const scoreGainValue = -1000;
+        if (player.streak > 50) {
+            const scoreGainValue = -10000;
+            const scoreGain = {
+                subject: 'штраф за читерство',
+                value: scoreGainValue,
+                congratz: -1,
+            }
+            scoreGains.push(scoreGain);
+        } else if (player.streak === 5) {
+            const scoreGainValue = -100;
             const scoreGain = {
                 subject: 'штраф за жадность',
                 value: scoreGainValue,
                 congratz: -1,
             }
             scoreGains.push(scoreGain);
-        } if (player.streak > 0) {
+        } else if (player.streak > 2) {
+            const scoreGainValue = 100 * Math.min(player.streak, 5);
+            const scoreGain = {
+                subject: 'чудесная серия побед',
+                value: scoreGainValue,
+                congratz: 4,
+            }
+            scoreGains.push(scoreGain);
+        } else if (player.streak > 0) {
             const scoreGainValue = 100 * Math.min(player.streak, 5);
             const scoreGain = {
                 subject: 'серия побед',
@@ -451,12 +606,20 @@ class Game {
                 congratz: 4,
             }
             scoreGains.push(scoreGain);
-        } else if (player.streak < -2) {
-            const scoreGainValue = -75;
+        } else if (player.streak === -3) {
+            const scoreGainValue = +3;
             const scoreGain = {
-                subject: 'серия неудач',
+                subject: 'компенсация за невезение',
                 value: scoreGainValue,
-                congratz: 4,
+                congratz: 0,
+            }
+            scoreGains.push(scoreGain);
+        } else if (player.streak === -5) {
+            const scoreGainValue = +1;
+            const scoreGain = {
+                subject: 'компенсация за фатальное невезение',
+                value: scoreGainValue,
+                congratz: 0,
             }
             scoreGains.push(scoreGain);
         }
@@ -523,7 +686,7 @@ class Game {
             const tag = topSimonym.smartVectorRecord.tag;
             const proximityPercent = (topSimonym.proximity * 100).toFixed()+'%';
             const rank = topSimonym.smartVectorRecord.vocabularyIdx;
-            const rankCategory = (rank > 80000) ? 'редк.' : '';
+            const rankCategory = (rank > rareRankThreshold) ? 'редк.' : '';
             //const line = `#${idx + 1}: ${lemma} ${tag} ${proximityPercent} R${rankCategory}`;
             const line = `#${idx + 1}: ${lemma} ${proximityPercent} ${rankCategory}`;
 

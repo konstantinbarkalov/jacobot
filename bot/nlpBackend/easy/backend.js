@@ -38,7 +38,20 @@ class EasyNlpBackend {
             return null;
         }
     }
-    getSimilar(lemma, count, maxRank = 30000, tag = 'NOUN') {
+    getRank(lemma) {
+        const smartVectors = this.w2v.smartVectorSet.byWord[lemma];
+        if (smartVectors) {
+            const minRank = Object.values(smartVectors).reduce((minRank, smartVector) => {
+                const rank = smartVector.vocabularyIdx;
+                minRank = Math.min(rank, minRank);
+                return minRank;
+            }, Infinity);
+            return minRank;
+        } else {
+            return null;
+        }
+    }
+    getSimilar(lemma, count, maxRank = Infinity, tag = 'NOUN') {
         const similars = this.w2v.findNearestsByLemma(lemma, tag, count, maxRank);
         if (similars) {
             return similars;
@@ -46,7 +59,7 @@ class EasyNlpBackend {
             return null;
         }
     }
-    getGoodCitation(tag = 'NOUN', maxRank = 30000, minRank = 0, goodTries = 10, maxTries = 100) {
+    getGoodCitation(tag = 'NOUN', maxRank = Infinity, minRank = 0, goodTries = 10, maxTries = 100) {
         let goodCitations = [];
         for (let tryIdx = 0; tryIdx < maxTries; tryIdx++) {
             const citation = this.tryGetRandomCitation(tag, maxRank, minRank);
@@ -64,7 +77,7 @@ class EasyNlpBackend {
         const bestGoodCitation = sortedGoodCitations[0];
         return bestGoodCitation;
     }
-    tryGetRandomCitation(tag = 'NOUN', maxRank = 30000, minRank = 0) {
+    tryGetRandomCitation(tag = 'NOUN', maxRank = Infinity, minRank = 0) {
         const corporaCitation = this.corpora.getRandomCitation();
         const chunks = corporaCitation.chunks;
         const lemmaCounts = chunks.reduce((chunkCounts, chunk) => {

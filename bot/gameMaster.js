@@ -9,6 +9,7 @@ const MiscOutputMessage = require('./miscOutputMessage.js');
 const aboutText = fs.readFileSync('./about.html',{encoding: 'utf8'});
 const rulesText = fs.readFileSync('./rules.html',{encoding: 'utf8'});
 const helpText = fs.readFileSync('./help.html',{encoding: 'utf8'});
+const jacobotVersion = require('./package.json').version; // for debug
 class GameMaster {
     activeGames = [];
     nlpBackend = new NlpBackend();
@@ -43,7 +44,9 @@ class GameMaster {
         //return new MiscOutputMessage(null, liveHelpHtml);
     }
     onDebug(ctx) {
+
         const debugMessage = {
+            jacobotVersion,
             message: ctx.message,
             memoryUsage: Object.fromEntries(Object.entries(process.memoryUsage()).map(([key, value])=> {
                 return [key, (value / 1024 / 1024).toFixed(0) + 'Mb'];

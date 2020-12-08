@@ -6,7 +6,7 @@ class W2v {
         await this.floatDb.preload();
         this.smartVectorSet = W2v.buildSmartVecotrSetFromFloatDb(this.floatDb);
     }
-    findNearestsByLemma(referenceLemma, tag = 'NOUN', limit = 10, maxRank = 30000, isReverse = false) {
+    findNearestsByLemma(referenceLemma, tag = 'NOUN', limit = 10, maxRank = Infinity, isReverse = false) {
         const referenceLemmaSmartVectorRecord = this.smartVectorSet.byTag[tag][referenceLemma];
         if (!referenceLemmaSmartVectorRecord) {
             return null;
@@ -14,7 +14,7 @@ class W2v {
             return this.findNearestsBySmartVectorRecord(referenceLemmaSmartVectorRecord, limit, maxRank, isReverse);
         }
     }
-    findNearestsBySmartVectorRecord(referenceLemmaSmartVectorRecord, limit = 10, maxRank = 30000, isReverse = false) {
+    findNearestsBySmartVectorRecord(referenceLemmaSmartVectorRecord, limit = 10, maxRank = Infinity, isReverse = false) {
         const nearestSmartVectorRecords = this.smartVectorSet.byRank.filter(smartVectorRecord => (smartVectorRecord.lemma !== referenceLemmaSmartVectorRecord.lemma) && (smartVectorRecord.vocabularyIdx < maxRank)).map(smartVectorRecord => {
             const proximity = this.calcProximity(smartVectorRecord, referenceLemmaSmartVectorRecord);
             return {
