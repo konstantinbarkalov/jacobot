@@ -5,8 +5,8 @@ const HotWord = require('./hotWord.js');
 const MiscOutputMessage = require('./miscOutputMessage.js');
 const PhraseBuilder = require('./phraseBuilder.js');
 
-const rareRankThreshold = 70000;
-const topSimonymRankThreshold = 100000;
+const uncommonRankThreshold = 70000;
+const topSimonymRankThreshold = 80000; // aka rareRankThreshold
 class Game {
     stepNum = 0;
     jacoGameUser = new GameUser('never', 'Яков', 'male');
@@ -187,11 +187,11 @@ class Game {
         const proximityPercent = (proximity * 100).toFixed() + '%';
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
-        const isRareWord = rank > rareRankThreshold;
-        const isToRareToBeInTop = rank > topSimonymRankThreshold;
+        const isUncommonWord = rank > uncommonRankThreshold;
+        const isTooRareToBeInTop = rank > topSimonymRankThreshold;
         const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].proximity;
         const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
-        const isHiddenTopSimonymJustGuessed = isToRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
+        const isHiddenTopSimonymJustGuessed = isTooRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
 
         const upcasedFragmentText = fragmentText.toUpperCase();
         let phrase;
@@ -385,18 +385,18 @@ class Game {
         const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
-        const isRareWord = rank > rareRankThreshold;
-        const isToRareToBeInTop = rank > topSimonymRankThreshold;
+        const isUncommonWord = rank > uncommonRankThreshold;
+        const isTooRareToBeInTop = rank > topSimonymRankThreshold;
         const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].proximity;
         const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
-        const isHiddenTopSimonymJustGuessed = isToRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
+        const isHiddenTopSimonymJustGuessed = isTooRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
 
         let scoreGains = [];
         if (checkGuessResult.topSimonym.isRobustGuess) {
-            if (isRareWord) {
+            if (isUncommonWord) {
                 const scoreGainValue = 750 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
                 const scoreGain = {
-                    subject: 'редкое близкое топ-слово',
+                    subject: 'нечастое близкое топ-слово',
                     value: scoreGainValue,
                     congratz: 1,
                 }
@@ -686,7 +686,7 @@ class Game {
             const tag = topSimonym.smartVectorRecord.tag;
             const proximityPercent = (topSimonym.proximity * 100).toFixed()+'%';
             const rank = topSimonym.smartVectorRecord.vocabularyIdx;
-            const rankCategory = (rank > rareRankThreshold) ? 'редк.' : '';
+            const rankCategory = (rank > uncommonRankThreshold) ? 'нечаст.' : '';
             //const line = `#${idx + 1}: ${lemma} ${tag} ${proximityPercent} R${rankCategory}`;
             const line = `#${idx + 1}: ${lemma} ${proximityPercent} ${rankCategory}`;
 
