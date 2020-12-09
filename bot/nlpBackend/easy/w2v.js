@@ -24,20 +24,43 @@ class W2v {
         });
 
 
-        let sortedNearestSmartVectorRecords;
+        // let sortedNearestSmartVectorRecords;
+        // if (isReverse) {
+        //     sortedNearestSmartVectorRecords = nearestSmartVectorRecords.sort((a, b)=> { return a.proximity - b.proximity });
+        // } else {
+        //     sortedNearestSmartVectorRecords = nearestSmartVectorRecords.sort((a, b)=> { return b.proximity - a.proximity });
+        // }
+        // const unqueLemmaNearestSmartVectorRecords = Object.values(Object.fromEntries(sortedNearestSmartVectorRecords.reverse().map((sortedNearestSmartVectorRecord) => {
+        //     return [sortedNearestSmartVectorRecord.smartVectorRecord.lemma, sortedNearestSmartVectorRecord];
+        // }))).reverse();
+
+
+        const nearestSmartVectorRecordsLemmaBinsMap = nearestSmartVectorRecords.reduce((nearestSmartVectorRecordsMap, nearestSmartVectorRecord) => {
+            let bin = nearestSmartVectorRecordsMap[nearestSmartVectorRecord.smartVectorRecord.lemma] || [];
+            bin.push(nearestSmartVectorRecord);
+            nearestSmartVectorRecordsMap[nearestSmartVectorRecord.smartVectorRecord.lemma] = bin;
+            return nearestSmartVectorRecordsMap;
+        }, {});
+        const nearestnearestSmartVectorRecordsLemmaBins = Object.values(nearestSmartVectorRecordsLemmaBinsMap);
+        const unqueLemmaNearestSmartVectorRecords = nearestnearestSmartVectorRecordsLemmaBins.map(bin => {
+            let sortedBinForLemma;
+            if (isReverse) {
+                sortedBinForLemma = bin.sort((a, b)=> { return a.proximity - b.proximity });
+            } else {
+                sortedBinForLemma = bin.sort((a, b)=> { return b.proximity - a.proximity });
+            }
+            return sortedBinForLemma[0];
+        });
+
+        let unqueLemmaSortedNearestSmartVectorRecords;
         if (isReverse) {
-            sortedNearestSmartVectorRecords = nearestSmartVectorRecords.sort((a, b)=> { return a.proximity - b.proximity });
+            unqueLemmaSortedNearestSmartVectorRecords = unqueLemmaNearestSmartVectorRecords.sort((a, b)=> { return a.proximity - b.proximity });
         } else {
-            sortedNearestSmartVectorRecords = nearestSmartVectorRecords.sort((a, b)=> { return b.proximity - a.proximity });
+            unqueLemmaSortedNearestSmartVectorRecords = unqueLemmaNearestSmartVectorRecords.sort((a, b)=> { return b.proximity - a.proximity });
         }
 
-        const unqueLemmaNearestSmartVectorRecord = Object.entries(Object.fromEntries(nearestSmartVectorRecords.reverse().map((nearestSmartVectorRecord) => {
-            return [nearestSmartVectorRecord.smartVectorRecord.lemma, nearestSmartVectorRecord];
-        }))).map(([lemma, nearestSmartVectorRecord]) => nearestSmartVectorRecord).reverse();
-
-
-        unqueLemmaNearestSmartVectorRecord.splice(limit);
-        return unqueLemmaNearestSmartVectorRecord;
+        unqueLemmaSortedNearestSmartVectorRecords.splice(limit);
+        return unqueLemmaSortedNearestSmartVectorRecords;
     }
     calcProximity(smartVectorRecordA, smartVectorRecordB) {
         let sum = 0;
