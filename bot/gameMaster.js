@@ -3,7 +3,7 @@ const NlpBackend = require('./nlpBackend/easy/backend.js');
 //const Game = require("./game.js");
 const Game = require("./game.js");
 const GamestepOutputMessage = require("./gamestepOutputMessage.js");
-const GameUserStorage = require('./gameUserStorage.js');
+const GameUserStorage = require('./gameUser/gameUserStorage.js');
 const MetrixAggregator = require('./metrixAggregator.js');
 const MiscOutputMessage = require('./miscOutputMessage.js');
 const aboutText = fs.readFileSync('./about.html',{encoding: 'utf8'});
@@ -13,11 +13,11 @@ const jacobotVersion = require('./package.json').version; // for debug
 class GameMaster {
     activeGames = [];
     nlpBackend = new NlpBackend();
-    gameUserStorage = new GameUserStorage();
+    gameUserStorage = null;
     metrixAggregator = new MetrixAggregator();
     async preload() {
         await this.nlpBackend.preload();
-        await this.gameUserStorage.preload();
+        this.gameUserStorage = GameUserStorage.preloadFromNewOrExistedStorageFile();
     }
     startNewGame(gameUser, gameUserGroup) {
         const game = new Game(this, gameUser, gameUserGroup);

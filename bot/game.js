@@ -1,6 +1,7 @@
 // 🧠💠🧩💡🔦🔍💬ℹ️✏️👉
 const GamestepOutputMessage = require("./gamestepOutputMessage.js");
-const GameUser = require('./gameUser.js');
+const GameUser = require('./gameUser/gameUser.js');
+const ScoreGain = require('./gameUser/scoreGain.js');
 const HotWord = require('./hotWord.js');
 const MiscOutputMessage = require('./miscOutputMessage.js');
 const PhraseBuilder = require('./phraseBuilder.js');
@@ -9,14 +10,14 @@ const uncommonRankThreshold = 70000;
 const topSimonymRankThreshold = 80000; // aka rareRankThreshold
 class Game {
     stepNum = 0;
-    jacoGameUser = new GameUser('never', 'Яков', 'male');
+    jacoGameUser = new GameUser('never', 'Яков');
     history = [];
     isInCooldown = false;
     constructor(gameMaster, innitiatorGameUser, gameUserGroup) {
         this.gameMaster = gameMaster;
         this.innitiatorGameUser = innitiatorGameUser;
         this.gameUserGroup = gameUserGroup;
-        this.players = [{score: 0, gameUser: innitiatorGameUser}];
+        this.players = [ { score: { sum: 0, gains: [], streak: 0 }, gameUser: innitiatorGameUser } ];
     }
     onMessage(messageText, gameUser) {
         if (this.isInCooldown) {
@@ -26,15 +27,11 @@ class Game {
         const messageTokens = messageText.split(' ');
         if (messageText === '?') {  // TODO
             const {boardText, citationText} = this.getCurrentStateText(); // TODO
-            return new GamestepOutputMessage(this, 0, null, null, boardText, citationText, null, null, null, null, false, true); // TODO
+            return new GamestepOutputMessage(this, 0, null, null, boardText, citationText, null, null, null, null, null, false, true); // TODO
         } else if (messageTokens.length === 1) {
             let player = this.players.find(player => player.gameUser === gameUser);
             if (!player) {
-                player = {
-                    score: 0,
-                    streak: 0,
-                    gameUser
-                }
+                player = { score: { sum: 0, gains: [], streak: 0 }, gameUser };
                 this.players.push(player);
             };
             const fragmentText = messageTokens[0];
@@ -66,24 +63,27 @@ class Game {
         const rank = this.gameMaster.nlpBackend.getRank(fragmentText);
         const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank);
         const referateText = PhraseBuilder.phrasesToText(referatePhrases);
-        const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank);
-        player.score += scoreGainSum;
+        const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal, scoreGains} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank);
+        player.score.sum += scoreGainSum;
+        //player.score.gainsPerStep[this.stepNum] = scoreGains;
+        player.score.gains = player.score.gains.concat(scoreGains);
 
-        if (Math.sign(player.streak) !== Math.sign(scoreGainSum)) {
-            player.streak = 0;
-        } else {
-            player.streak += Math.sign(scoreGainSum);
+        if  ((Math.sign(player.score.streak) !== Math.sign(scoreGainSum))) {
+            player.score.streak = 0;
         }
+        player.score.streak += Math.sign(scoreGainSum);
 
         let answerText = '';
         answerText += referateText;
         answerText += '\n';
-
         scoreGainTextLines.forEach(answerTextLine => answerText += answerTextLine + '\n');
+
+        let scoreDetailsText;
 
         let hintPhrase = '';
         let aidPhrase = '';
         if (isFinal) {
+            scoreDetailsText = this.getGameScoreDetailsText();
             this.hotWord.openHotWord();
             this.end();
             hintPhrase = '⏹ эта игра окончена, напишите мне /go или «+» чтобы сыграть ещё раз.';
@@ -113,9 +113,14 @@ class Game {
         //console.log(checkGuessResult);
         //console.log(stat);
         const {boardText, citationText, shortCitationText} = this.getCurrentStateText();
+        let unfinalShortCitationText;
+        if (!isFinal) {
+            unfinalShortCitationText = shortCitationText;
+        }
+
         this.stepNum++;
         const preAnswerText = '⏱ Ответ принят! Итак...';
-        const gamestepOutputMessage = new GamestepOutputMessage(this, 3000, preAnswerText, answerText, boardText, citationText, shortCitationText, hintText, aidText, congratzMax, isFinal);
+        const gamestepOutputMessage = new GamestepOutputMessage(this, 3000, preAnswerText, answerText, boardText, citationText, unfinalShortCitationText, hintText, aidText, scoreDetailsText, congratzMax, isFinal);
         const historyEvent = {
             player,
             fragmentText,
@@ -130,9 +135,17 @@ class Game {
         this.isPlaing = false;
         this.isDone = true;
         this.endTimestamp = Date.now();
+
+        /// remove
+        this.players.forEach(player => {
+            player.gameUser.scoreStat.addFromGame(this, player.gameUser.genericUserUid);
+        });
+        this.gameMaster.gameUserStorage.save();
+        /// remove
+
         this.gameMaster.removeActiveGame(this);
         const {boardText, citationText} = this.getCurrentStateText();
-        return new GamestepOutputMessage(this, 0, null, 'Кто-то дернул стоп-кран! Игра окончена.', boardText, citationText, null, null, null, null, true);
+        return new GamestepOutputMessage(this, 0, null, 'Кто-то дернул стоп-кран! Игра окончена.', boardText, citationText, null, null, null, null, null, true);
     }
 
     start() {
@@ -176,14 +189,14 @@ class Game {
         this.isDone = true;
         this.endTimestamp = Date.now();
         this.players.forEach(player => {
-            player.gameUser.stat.score += player.score;
-            player.gameUser.stat.gamesCount++;
+            player.gameUser.scoreStat.addFromGame(this, player.gameUser.genericUserUid);
         });
+        this.gameMaster.gameUserStorage.save();
         this.gameMaster.removeActiveGame(this);
     }
 
     referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank) {
-        const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
+        const minUnguessedToWin = Math.max(0, Math.floor((this.hotWord.wordText.length - 2) / 5));
         const proximityPercent = (proximity * 100).toFixed() + '%';
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
@@ -382,7 +395,7 @@ class Game {
         return phrases;
     }
     referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank) {
-        const minUnguessedToWin = Math.floor(this.hotWord.wordText.length / 5);
+        const minUnguessedToWin = Math.max(0, Math.floor((this.hotWord.wordText.length - 2) / 5));
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
         const isUncommonWord = rank > uncommonRankThreshold;
@@ -395,38 +408,38 @@ class Game {
         if (checkGuessResult.topSimonym.isRobustGuess) {
             if (isUncommonWord) {
                 const scoreGainValue = 750 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
-                const scoreGain = {
-                    subject: 'нечастое близкое топ-слово',
-                    value: scoreGainValue,
-                    congratz: 1,
-                }
+                const subject = 'нечастое близкое топ-слово';
+                const value = scoreGainValue;
+                const congratz = 1;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             } else {
                 const scoreGainValue = 250 + Math.round(750 / (checkGuessResult.topSimonym.justTopGuessedSimonymIdx + 1));
-                const scoreGain = {
-                    subject: 'близкое топ-слово',
-                    value: scoreGainValue,
-                    congratz: 1,
-                }
+                const subject = 'близкое топ-слово';
+                const value = scoreGainValue;
+                const congratz = 1;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             }
         }
         if (isHiddenTopSimonymJustGuessed) {
             if (checkGuessResult.hotWord.isRobustGuess) {
                 const scoreGainValue = 5000;
-                const scoreGain = {
-                    subject: 'секретное топ-слово внутри слова',
-                    value: scoreGainValue,
-                    congratz: 1,
-                }
+                const subject = 'секретное топ-слово внутри слова';
+                const value = scoreGainValue;
+                const congratz = 1;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             } else {
                 const scoreGainValue = 1000;
-                const scoreGain = {
-                    subject: 'секретное топ-слово',
-                    value: scoreGainValue,
-                    congratz: 1,
-                }
+                const subject = 'секретное топ-слово';
+                const value = scoreGainValue;
+                const congratz = 1;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             }
         }
@@ -435,91 +448,91 @@ class Game {
             if (checkGuessResult.hotWord.isLetter) {
                 if (fragmentText === 'ъ') {
                     const scoreGainValue = 666 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
-                    const scoreGain = {
-                        subject: 'это знак! (твердый)',
-                        value: scoreGainValue,
-                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
-                    }
+                    const subject = 'это знак! (твердый)';
+                    const value = scoreGainValue;
+                    const congratz = Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
+                    const isFinal = false;
+                    const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                     scoreGains.push(scoreGain);
                 } else if (fragmentText === 'ь') {
                     const scoreGainValue = 66 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
-                    const scoreGain = {
-                        subject: 'это знак! (мягкий)',
-                        value: scoreGainValue,
-                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
-                    }
+                    const subject = 'это знак! (мягкий)';
+                    const value = scoreGainValue;
+                    const congratz = Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
+                    const isFinal = false;
+                    const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                     scoreGains.push(scoreGain);
                 } else if (fragmentText === 'я') {
                     const scoreGainValue = 99 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
-                    const scoreGain = {
-                        subject: 'любимая буква',
-                        value: scoreGainValue,
-                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
-                    }
+                    const subject = 'любимая буква';
+                    const value = scoreGainValue;
+                    const congratz = Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
+                    const isFinal = false;
+                    const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                     scoreGains.push(scoreGain);
                 } else {
                     const scoreGainValue = 50 * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
-                    const scoreGain = {
-                        subject: 'буква',
-                        value: scoreGainValue,
-                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
-                    }
+                    const subject = 'буква';
+                    const value = scoreGainValue;
+                    const congratz = Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
+                    const isFinal = false;
+                    const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                     scoreGains.push(scoreGain);
                 }
 
             } else {
                 if (!checkGuessResult.hotWord.isEquallyHotWord && checkGuessResult.hotWord.isEquallyHotLemma) {
                     const scoreGainValue = 10000;
-                    const scoreGain = {
-                        subject: 'лемма внутри слова',
-                        value: scoreGainValue,
-                        congratz: 6,
-                    }
+                    const subject = 'лемма внутри слова';
+                    const value = scoreGainValue;
+                    const congratz = 6;
+                    const isFinal = false;
+                    const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                     scoreGains.push(scoreGain);
                 } else {
                     const scoreGainValue = 50 * checkGuessResult.hotWord.justGuessedHotWordLetters.length * checkGuessResult.hotWord.justGuessedHotWordLetters.length;
-                    const scoreGain = {
-                        subject: 'фрагмент',
-                        value: scoreGainValue,
-                        congratz: Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3),
-                    }
+                    const subject = 'фрагмент';
+                    const value = scoreGainValue;
+                    const congratz = Math.min(Math.floor(checkGuessResult.hotWord.justGuessedHotWordLetters.length / 2 + 1), 3);
+                    const isFinal = false;
+                    const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                     scoreGains.push(scoreGain);
                 }
             }
         } else if (!checkGuessResult.hotWord.isEquallyHotWord && checkGuessResult.hotWord.isEquallyHotLemma  && !checkGuessResult.hotWord.wasGuessed) {
             const scoreGainValue = 500;
-            const scoreGain = {
-                subject: 'лемма',
-                value: scoreGainValue,
-                congratz: 2,
-            }
+            const subject = 'лемма';
+            const value = scoreGainValue;
+            const congratz = 2;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
         }
 
         if (!checkGuessResult.topSimonym.isRobustGuess && !checkGuessResult.hotWord.isRobustGuess) {
             if (checkGuessResult.hotWord.wasGuessed) {
                 const scoreGainValue = -50;
-                const scoreGain = {
-                    subject: 'невнимательность',
-                    value: scoreGainValue,
-                    congratz: -1,
-                }
+                const subject = 'невнимательность';
+                const value = scoreGainValue;
+                const congratz = -1;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             } else if (isKnownWord && !checkGuessResult.topSimonym.wasGuessed) {
                 const scoreGainValue = -10;
-                const scoreGain = {
-                    subject: 'цена любопытства',
-                    value: scoreGainValue,
-                    congratz: 0,
-                }
+                const subject = 'цена любопытства';
+                const value = scoreGainValue;
+                const congratz = 0;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             } else {
                 const scoreGainValue = -25;
-                const scoreGain = {
-                    subject: 'неудача',
-                    value: scoreGainValue,
-                    congratz: -1,
-                }
+                const subject = 'неудача';
+                const value = scoreGainValue;
+                const congratz = -1;
+                const isFinal = false;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
                 scoreGains.push(scoreGain);
             }
         }
@@ -527,117 +540,124 @@ class Game {
         if (checkGuessResult.hotWord.isRobustGuess) {
             if (checkGuessResult.hotWord.isEquallyHotWord) {
                 const scoreGainValue = 2000;
-                const scoreGain = {
-                    subject: 'слово названо точно',
-                    value: scoreGainValue,
-                    congratz: 5,
-                    isFinal: true,
-                }
+                const subject = 'слово названо точно';
+                const value = scoreGainValue;
+                const congratz = 5;
+                const isFinal = true;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
+
                 scoreGains.push(scoreGain);
             } else if (stat.hotWord.unguessedLetters.length === 0) {
                 const scoreGainValue = 1000;
-                const scoreGain = {
-                    subject: 'слово раскрыто полностью',
-                    value: scoreGainValue,
-                    congratz: 5,
-                    isFinal: true,
-                }
+                const subject = 'слово раскрыто полностью';
+                const value = scoreGainValue;
+                const congratz = 5;
+                const isFinal = true;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
+
                 scoreGains.push(scoreGain);
             } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
                 const scoreGainValue = 500;
-                const scoreGain = {
-                    subject: 'слово раскрыто почти полностью',
-                    value: scoreGainValue,
-                    congratz: 4,
-                    isFinal: true,
-                }
+                const subject = 'слово раскрыто почти полностью';
+                const value = scoreGainValue;
+                const congratz = 4;
+                const isFinal = true;
+                const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
+
                 scoreGains.push(scoreGain);
             }
         } else if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin) {
             const scoreGainValue = 1;
-            const scoreGain = {
-                subject: 'слово мучительно выпытано',
-                value: scoreGainValue,
-                congratz: 0,
-                isFinal: true,
-            }
+            const subject = 'слово мучительно выпытано';
+            const value = scoreGainValue;
+            const congratz = 0;
+            const isFinal = true;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
         }
 
         if (stat.hotWord.unguessedLetters.length <= minUnguessedToWin && this.stepNum < 10) {
-            const scoreGainValue = 3000 / (this.stepNum + 1);
-            const scoreGain = {
-                subject: 'быстрая победа',
-                value: scoreGainValue,
-                congratz: 6,
-                isFinal: true,
-            }
+            const scoreGainValue = Math.round(3000 / (this.stepNum + 1));
+            const subject = 'быстрая победа';
+            const value = scoreGainValue;
+            const congratz = 6;
+            const isFinal = true;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
         }
-        if (player.streak > 50) {
+
+        const nextSteakSign = Math.sign(scoreGains.reduce((sum, scoreGain) => { return sum + scoreGain.value; }, 0));
+
+        if (nextSteakSign > 0 && player.score.streak > 50) {
             const scoreGainValue = -10000;
-            const scoreGain = {
-                subject: 'штраф за читерство',
-                value: scoreGainValue,
-                congratz: -1,
-            }
+            const subject = 'штраф за читерство';
+            const value = scoreGainValue;
+            const congratz = -1;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
-        } else if (player.streak === 5) {
+        } else if (nextSteakSign > 0 && player.score.streak === 5) {
             const scoreGainValue = -100;
-            const scoreGain = {
-                subject: 'штраф за жадность',
-                value: scoreGainValue,
-                congratz: -1,
-            }
+            const subject = 'штраф за жадность';
+            const value = scoreGainValue;
+            const congratz = -1;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
-        } else if (player.streak > 2) {
-            const scoreGainValue = 100 * Math.min(player.streak, 5);
-            const scoreGain = {
-                subject: 'чудесная серия побед',
-                value: scoreGainValue,
-                congratz: 4,
-            }
+        } else if (nextSteakSign > 0 && player.score.streak > 2) {
+            const scoreGainValue = 100 * Math.min(player.score.streak + 1, 5);
+            const subject = 'чудесная серия побед';
+            const value = scoreGainValue;
+            const congratz = 4;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
-        } else if (player.streak > 0) {
-            const scoreGainValue = 100 * Math.min(player.streak, 5);
-            const scoreGain = {
-                subject: 'серия побед',
-                value: scoreGainValue,
-                congratz: 4,
-            }
+        } else if (nextSteakSign > 0 && player.score.streak > 0) {
+            const scoreGainValue = 100 * Math.min(player.score.streak + 1, 5);
+            const subject = 'серия побед';
+            const value = scoreGainValue;
+            const congratz = 4;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
-        } else if (player.streak === -3) {
+        } else if (nextSteakSign < 0 && player.score.streak === -3) {
             const scoreGainValue = +3;
-            const scoreGain = {
-                subject: 'компенсация за невезение',
-                value: scoreGainValue,
-                congratz: 0,
-            }
+            const subject = 'компенсация за невезение';
+            const value = scoreGainValue;
+            const congratz = 0;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
-        } else if (player.streak === -5) {
+        } else if (nextSteakSign < 0 && player.score.streak === -5) {
             const scoreGainValue = +1;
-            const scoreGain = {
-                subject: 'компенсация за фатальное невезение',
-                value: scoreGainValue,
-                congratz: 0,
-            }
+            const subject = 'компенсация за фатальное невезение';
+            const value = scoreGainValue;
+            const congratz = 0;
+            const isFinal = false;
+            const scoreGain = new ScoreGain(subject, value, this.stepNum, fragmentText, congratz, isFinal);
             scoreGains.push(scoreGain);
         }
         const initialReferateResult = {scoreGainTextLines: [], scoreGainSum: 0, congratzMax: -Infinity, isFinal: false};
         if (scoreGains.length > 0) {
             const referateResult = scoreGains.reduce((referateResult, scoreGain) => {
-                const scoreGainSignedText = ((scoreGain.value >= 0) ? '+' : '-') + Math.abs(scoreGain.value);
-                // 💰💲🔹
-                const scoreGainTextLine = `💰 ${player.score + referateResult.scoreGainSum} <b>[ ${scoreGainSignedText} ]</b> = ${player.score + referateResult.scoreGainSum + scoreGain.value}  / ${scoreGain.subject} /`;
+                const scoreGainSignedText = ((scoreGain.value >= 0) ? '+' : '−') + Math.abs(scoreGain.value);
+                const sumBefore = player.score.sum + referateResult.scoreGainSum;
+                const sumAfter = sumBefore + scoreGain.value;
+                const scoreGainSumAfterSignedText = ((sumAfter >= 0) ? '+' : '−') + Math.abs(sumAfter);
+                const scoreGainSumBeforeSignedText = ((sumBefore >= 0) ? '+' : '−') + Math.abs(sumBefore);
+                // 💰🔹
+                const scoreGainTextLine = `💳 ${scoreGainSumBeforeSignedText} <b>[ ${scoreGainSignedText}💰 ]</b> = ${scoreGainSumAfterSignedText} / ${scoreGain.subject} /`;
                 referateResult.scoreGainTextLines.push(scoreGainTextLine);
                 referateResult.scoreGainSum += scoreGain.value;
                 referateResult.congratzMax = Math.max(scoreGain.congratz, referateResult.congratzMax);
                 referateResult.isFinal = !!(scoreGain.isFinal || referateResult.isFinal);
                 return referateResult;
             }, initialReferateResult);
+            referateResult.scoreGains = scoreGains;
             return referateResult;
         } else {
             const referateResult =  Object.assign({}, initialReferateResult, {congratzMax: 0});
+            referateResult.scoreGains = [];
             return referateResult;
         }
     }
@@ -750,6 +770,126 @@ class Game {
             boardText += `и 🔄 ${this.stepNum + 1} ходов. `;
         }
         return {boardText, citationText, shortCitationText};
+    }
+    getGameScoreDetailsText() {
+        const isMultiplayer = this.players.length > 1;
+        const sortedPlayers = this.players.sort((a, b) => b.score.sum - a.score.sum);
+        sortedPlayers.splice(3);
+        const detailsText = sortedPlayers.map((player, currentGameRank) => {
+            let userRankEmoji;
+            if (currentGameRank === 0) {
+                userRankEmoji = '🥇';
+            } else if (currentGameRank === 1) {
+                userRankEmoji = '🥈';
+            } else {
+                userRankEmoji = '🥉';
+            }
+            let playerDetailsHeaderText = '';
+            playerDetailsHeaderText += `👨‍🎓 ${player.gameUser.name} ${userRankEmoji}`;
+            playerDetailsHeaderText += '\n';
+            playerDetailsHeaderText += '-----------------------------';
+            playerDetailsHeaderText += '\n';
+
+            const playerDetailsText = this.getGameScoreDetailsTextForPlayer(player);
+            const playerSummaryText = this.getGameScoreSummaryTextForPlayer(player);
+
+            return playerDetailsHeaderText + playerDetailsText + playerSummaryText + '\n';
+        }).join('\n\n');
+        return detailsText;
+    }
+    getGameScoreDetailsTextForPlayer(player) {
+
+        const gainsPerSubject = player.score.gains.reduce((gainsPerSubject, scoreGain) => {
+            let bin = gainsPerSubject[scoreGain.subject];
+            if (!bin) {
+                bin = []
+                gainsPerSubject[scoreGain.subject] = bin;
+            }
+            bin.push(scoreGain);
+            return gainsPerSubject;
+        }, {});
+
+        const lines = Object.entries(gainsPerSubject).map(([subject, bin]) => {
+            const initialScoreGainsInfo = {lines: [], sum: 0, count: 0};
+            const similarGainsInfo = bin.reduce((similarGainsInfo, scoreGain) => {
+                const scoreGainSignedText = ((scoreGain.value >= 0) ? '+' : '−') + Math.abs(scoreGain.value);
+                const scoreGainTextLine = `${scoreGainSignedText}`;
+                similarGainsInfo.lines.push(scoreGainTextLine);
+                similarGainsInfo.sum += scoreGain.value;
+                similarGainsInfo.count++;
+                return similarGainsInfo;
+            }, initialScoreGainsInfo);
+
+
+
+            let xFactorText = '';
+            if (similarGainsInfo.count > 1) {
+                xFactorText = ' x' + similarGainsInfo.count;
+            }
+            const scoreGainSignedText = ((similarGainsInfo.sum >= 0) ? '+' : '−') + Math.abs(similarGainsInfo.sum);
+            const subsumText = `${scoreGainSignedText}`;
+            const similarGainsLine = (similarGainsInfo.lines.length > 1) ? similarGainsInfo.lines.join(' ') + ' = ' : '';
+
+            let badge = '🏅 ';
+            const groupStat = player.gameUser.scoreStat.groupStats[this.gameUserGroup.genericUserGroupUid];
+            if (groupStat) {
+                const coreGainsGroupSummary = groupStat.getScoreGainsGroupSummary();
+                const maxGainsSumForSubject = coreGainsGroupSummary.maxScoreGainsSumsBySubjet[subject];
+                if (maxGainsSumForSubject === undefined) {
+                    badge = '🎖 NEW! ';
+                } else if (similarGainsInfo.sum > maxGainsSumForSubject) {
+                    badge = '🏆 RECORD! ';
+                }
+            }
+            // 🏅🚩🆕🎖
+            const scoreGainTextLine = `${badge}<b>${subject.toUpperCase()}</b>${xFactorText}: ${similarGainsLine}${subsumText}💰`;
+            return scoreGainTextLine;
+        });
+        let detailsText = '';
+        detailsText += lines.join('\n');
+        detailsText += '\n';
+        detailsText += '-----------------------------';
+        detailsText += '\n';
+        detailsText += `💳 ВСЕГО ЗА ИГРУ: <b>${player.score.sum}</b>💰`;
+        return detailsText;
+    }
+    getGameScoreSummaryTextForPlayer(player) {
+
+        let summarysText = '';
+
+        const groupStat = player.gameUser.scoreStat.groupStats[this.gameUserGroup.genericUserGroupUid];
+
+        if (groupStat && groupStat.gameStats.length > 0) {
+            const gameStats = groupStat.gameStats;
+            const initialMmm = {count: 0, step: {min: Infinity, max: -Infinity, sum: 0}, score: {min: Infinity, max: -Infinity, sum: 0, all: []}};
+            const mmm = gameStats.reduce((mmm, gameStat) => {
+                mmm.step.min = Math.min(mmm.step.min, gameStat.stepsCount);
+                mmm.step.max = Math.max(mmm.step.max, gameStat.stepsCount);
+                mmm.step.sum += gameStat.stepsCount;
+                const score = gameStat.scoreGains.reduce((score, scoreGain) => {return score + scoreGain.value}, 0);
+                mmm.score.min = Math.min(mmm.score.min, score);
+                mmm.score.max = Math.max(mmm.score.max, score);
+                mmm.score.sum += score;
+                mmm.score.all.push(score);
+                mmm.count++;
+                return mmm;
+            }, initialMmm);
+            mmm.step.mean = mmm.step.sum / mmm.count;
+            mmm.score.mean = mmm.score.sum / mmm.count;
+            const stepSortedStepsCount = gameStats.map(gameStat => gameStat.stepsCount).sort();
+            const sortedGameScores = mmm.score.all.sort();
+            mmm.step.median = stepSortedStepsCount[Math.floor(stepSortedStepsCount.length / 2)];
+            mmm.score.median = sortedGameScores[Math.floor(sortedGameScores.length / 2)];
+
+            summarysText += '\n';
+            summarysText += '-----------------------------';
+            summarysText += '\n';
+            summarysText += `📊 В этом сезоне сыграно ${mmm.count} игр. ⏱ Количество ходов: <b>мед. ${mmm.step.median.toFixed(0)}</b>, сред. ${mmm.step.mean.toFixed(0)}, макс. ${mmm.step.max.toFixed(0)}, мин. ${mmm.step.min.toFixed(0)}. 💳 Очков за игру: <b>мед. ${mmm.score.median.toFixed(0)}</b>, сред. ${mmm.score.mean.toFixed(0)}, макс. ${mmm.score.max.toFixed(0)}, мин. ${mmm.score.min.toFixed(0)}.`;
+            summarysText += '\n';
+        }
+
+
+        return summarysText;
     }
 }
 module.exports = Game;
