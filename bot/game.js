@@ -78,14 +78,28 @@ class Game {
         answerText += '\n';
         scoreGainTextLines.forEach(answerTextLine => answerText += answerTextLine + '\n');
 
-        let scoreDetailsText;
+        let scoreInfoText = '';
 
         let hintPhrase = '';
         let aidPhrase = '';
         if (isFinal) {
-            scoreDetailsText = this.getGameScoreDetailsText();
+            const isMultiplayer = this.players.length > 1;
+            const sortedPlayers = this.players.sort((a, b) => b.score.sum - a.score.sum);
+            sortedPlayers.splice(3);
+
+            const scoreDetailsTextsPerTopPlayer = this.getGameScoreDetailsText(sortedPlayers); // do before game end (asd stats applied)
+
             this.hotWord.openHotWord();
             this.end();
+
+            const scoreSummaryTextsPerTopPlayer = this.getGameScoreSummaryText(sortedPlayers); // do after game end (asd stats applied)
+
+            for (let idx = 0; idx < sortedPlayers.length; idx++) {
+                const scoreDetailsTextForPlayer = scoreDetailsTextsPerTopPlayer[idx];
+                const scoreSummaryTextForPlayer = scoreSummaryTextsPerTopPlayer[idx];
+                scoreInfoText += scoreDetailsTextForPlayer + scoreSummaryTextForPlayer + '\n';
+            }
+
             hintPhrase = '⏹ эта игра окончена, напишите мне /go или «+» чтобы сыграть ещё раз.';
         } else {
             hintPhrase = '⏱ Следующий ход!..';
@@ -120,7 +134,7 @@ class Game {
 
         this.stepNum++;
         const preAnswerText = '⏱ Ответ принят! Итак...';
-        const gamestepOutputMessage = new GamestepOutputMessage(this, 3000, preAnswerText, answerText, boardText, citationText, unfinalShortCitationText, hintText, aidText, scoreDetailsText, congratzMax, isFinal);
+        const gamestepOutputMessage = new GamestepOutputMessage(this, 3000, preAnswerText, answerText, boardText, citationText, unfinalShortCitationText, hintText, aidText, scoreInfoText, congratzMax, isFinal);
         const historyEvent = {
             player,
             fragmentText,
@@ -771,11 +785,8 @@ class Game {
         }
         return {boardText, citationText, shortCitationText};
     }
-    getGameScoreDetailsText() {
-        const isMultiplayer = this.players.length > 1;
-        const sortedPlayers = this.players.sort((a, b) => b.score.sum - a.score.sum);
-        sortedPlayers.splice(3);
-        const detailsText = sortedPlayers.map((player, currentGameRank) => {
+    getGameScoreDetailsText(sortedPlayers) {
+        const detailsTextsPerPlayer = sortedPlayers.map((player, currentGameRank) => {
             let userRankEmoji;
             if (currentGameRank === 0) {
                 userRankEmoji = '🥇';
@@ -791,11 +802,10 @@ class Game {
             playerDetailsHeaderText += '\n';
 
             const playerDetailsText = this.getGameScoreDetailsTextForPlayer(player);
-            const playerSummaryText = this.getGameScoreSummaryTextForPlayer(player);
 
-            return playerDetailsHeaderText + playerDetailsText + playerSummaryText + '\n';
-        }).join('\n\n');
-        return detailsText;
+            return playerDetailsHeaderText + playerDetailsText;
+        });
+        return detailsTextsPerPlayer;
     }
     getGameScoreDetailsTextForPlayer(player) {
 
@@ -853,9 +863,15 @@ class Game {
         detailsText += `💳 ВСЕГО ЗА ИГРУ: <b>${player.score.sum}</b>💰`;
         return detailsText;
     }
+    getGameScoreSummaryText(sortedPlayers) {
+        const summaryTextsPerPlayer = sortedPlayers.map((player) => {
+            return this.getGameScoreSummaryTextForPlayer(player);
+        });
+        return summaryTextsPerPlayer;
+    }
     getGameScoreSummaryTextForPlayer(player) {
 
-        let summarysText = '';
+        let summaryText = '';
 
         const groupStat = player.gameUser.scoreStat.groupStats[this.gameUserGroup.genericUserGroupUid];
 
@@ -881,15 +897,15 @@ class Game {
             mmm.step.median = stepSortedStepsCount[Math.floor(stepSortedStepsCount.length / 2)];
             mmm.score.median = sortedGameScores[Math.floor(sortedGameScores.length / 2)];
 
-            summarysText += '\n';
-            summarysText += '-----------------------------';
-            summarysText += '\n';
-            summarysText += `📊 В этом сезоне сыграно ${mmm.count} игр. ⏱ Количество ходов: <b>мед. ${mmm.step.median.toFixed(0)}</b>, сред. ${mmm.step.mean.toFixed(0)}, макс. ${mmm.step.max.toFixed(0)}, мин. ${mmm.step.min.toFixed(0)}. 💳 Очков за игру: <b>мед. ${mmm.score.median.toFixed(0)}</b>, сред. ${mmm.score.mean.toFixed(0)}, макс. ${mmm.score.max.toFixed(0)}, мин. ${mmm.score.min.toFixed(0)}.`;
-            summarysText += '\n';
+            summaryText += '\n';
+            summaryText += '-----------------------------';
+            summaryText += '\n';
+            summaryText += `📊 В этом сезоне сыграно ${mmm.count} игр. ⏱ Количество ходов: <b>мед. ${mmm.step.median.toFixed(0)}</b>, сред. ${mmm.step.mean.toFixed(0)}, макс. ${mmm.step.max.toFixed(0)}, мин. ${mmm.step.min.toFixed(0)}. 💳 Очков за игру: <b>мед. ${mmm.score.median.toFixed(0)}</b>, сред. ${mmm.score.mean.toFixed(0)}, макс. ${mmm.score.max.toFixed(0)}, мин. ${mmm.score.min.toFixed(0)}.`;
+            summaryText += '\n';
         }
 
 
-        return summarysText;
+        return summaryText;
     }
 }
 module.exports = Game;

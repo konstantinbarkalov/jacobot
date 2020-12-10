@@ -258,8 +258,8 @@ async function richReplyGamestep(ctx, gamestepOutputMessage, genericUserGroupUid
         postAnswerHtmlLines.push(gamestepOutputMessage.aid);
     }
 
-    if (gamestepOutputMessage.scoreDetails) {
-        postAnswerHtmlLines.push(gamestepOutputMessage.scoreDetails);
+    if (gamestepOutputMessage.scoreInfo) {
+        postAnswerHtmlLines.push(gamestepOutputMessage.scoreInfo);
     }
 
     if (gamestepOutputMessage.shortCitation) {

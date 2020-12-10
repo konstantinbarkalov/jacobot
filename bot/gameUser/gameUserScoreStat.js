@@ -36,7 +36,7 @@ class GameUserScoreGameStat extends Plainable {
         }
     }
     static fromGame(game, genericUserUid) {
-        const player = game.players.find(player => player.gameUser.genericUserUid = genericUserUid);
+        const player = game.players.find(player => player.gameUser.genericUserUid === genericUserUid);
         const startTimestamp = game.startTimestamp;
         const endTimestamp = game.endTimestamp;
         const stepsCount = game.stepNum;
