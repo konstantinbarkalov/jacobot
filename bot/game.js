@@ -848,11 +848,11 @@ class Game {
                 if (maxGainsSumForSubject === undefined) {
                     badge = '🎖 NEW! ';
                 } else if (similarGainsInfo.sum > maxGainsSumForSubject) {
-                    badge = '🏆 RECORD! ';
+                    badge = '🏆 BEST! ';
                 }
             }
             // 🏅🚩🆕🎖
-            const scoreGainTextLine = `${badge}<b>${subject.toUpperCase()}</b>${xFactorText}: ${similarGainsLine}${subsumText}💰`;
+            const scoreGainTextLine = `${badge}<b>${subject.toUpperCase()}</b>${xFactorText}\n${similarGainsLine}${subsumText}💰`;
             return scoreGainTextLine;
         });
         let detailsText = '';
