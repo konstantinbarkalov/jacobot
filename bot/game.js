@@ -381,7 +381,7 @@ class Game {
                     // CASE: несловарный фрагмент (не буква), новых букв не угадано, уже угадывали раньше фрагмент, в котором этот есть целиком
                     phrase = `✴️ к сожалению, новых букв не угадано. Обратите внимание, что ✳️ «<b>${upcasedFragmentText}</b>» содержится в "${checkGuessResult.hotWord.wasGoodGuessedSuperstring.toUpperCase()}", а это ранее уже угадывали.`;
                 } else {
-                    phrase = `✴️ несловарный фрагмент «<b>${upcasedFragmentText}</b>», ни одной буквы не угадано.`;
+                    phrase = `✴️ не знаю что это такое — «<b>${upcasedFragmentText}</b>», но такого фрагмента в слове нет.`;
                 }
             }
         }
