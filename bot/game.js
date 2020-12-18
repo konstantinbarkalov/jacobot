@@ -147,6 +147,7 @@ class Game {
 
     onAbort() {
         this.isPlaing = false;
+        this.isAborted = true;
         this.isDone = true;
         this.endTimestamp = Date.now();
 
@@ -162,11 +163,42 @@ class Game {
         return new GamestepOutputMessage(this, 0, null, 'Кто-то дернул стоп-кран! Игра окончена.', boardText, citationText, null, null, null, null, null, true);
     }
 
+    onGameStat() {
+        const hotWordRank = this.gameMaster.nlpBackend.getRank(this.hotWord.lemmaText);
+        const stat = {
+            'сложность': (this.difficultyRatio * 100).toFixed() + '%',
+            'ход': this.stepNum + 1,
+            'кол-во игроков': this.players.length,
+            'статус игры': this.isPlaing ? (this.isInCooldown ? 'кулдаун' : 'игра в процессе' ) : this.isAborted ? 'игра сброшена' : this.isDone ? 'игра окончена' :'игра в коме',
+            'ранг загаданного слова': hotWordRank,
+        }
+        let statText = Object.entries(stat).map(([key, value]) => `${key}: ${value}`).join('\n');
+
+        return new MiscOutputMessage(this, statText);
+    }
+
     start() {
+        const isSingleplayer = this.gameUserGroup.genericUserGroupUid === this.innitiatorGameUser.genericUserUid;
+        if (isSingleplayer) {
+            const logBase = 1000;
+            const positiveGamesCount = 1 + this.innitiatorGameUser.scoreStat.gamesCount * (logBase - 1) / logBase;
+            const gamesCountLog = Math.log(positiveGamesCount) / Math.log(logBase);
+            this.difficultyRatio = Math.max(0, Math.min(1, gamesCountLog));
+            this.difficultyRatio = 0;
+            // 0.0 at 0, 1.0 at 1000, 0.5 at 30, 0.25 at 5, 0.75 at 177, 0.9 at 500
+        } else {
+            this.difficultyRatio = 0.5;
+        }
         this.isPlaing = true;
+        this.isAborted = false;
         this.isDone = false;
 
-        const randomCitation = this.gameMaster.nlpBackend.getGoodCitation();
+        // difficulty based
+        const desiredTag = (this.difficultyRatio < 0.2) ? 'NOUN' : undefined;
+        const maxRank =  150000 * this.difficultyRatio + 100 * (1 - this.difficultyRatio);
+        const minRank = 100 * this.difficultyRatio + 0 * (1 - this.difficultyRatio);
+
+        const randomCitation = this.gameMaster.nlpBackend.getGoodCitation(desiredTag, maxRank, minRank);
         this.randomCitation = randomCitation;
         const hotWordText = randomCitation.hotChunk.word.toLowerCase();
         const hotWordLemma = randomCitation.hotChunk.lemma.toLowerCase();
@@ -174,7 +206,6 @@ class Game {
 
         this.topSimonyms = this.gameMaster.nlpBackend.getSimilar(hotWordLemma, 20, topSimonymRankThreshold, hotWordTag);
         const topSimonymTexts = this.topSimonyms.map(topSimonym => topSimonym.smartVectorRecord.lemma);
-
 
 
         this.hotWord = new HotWord(hotWordText, hotWordLemma, topSimonymTexts);

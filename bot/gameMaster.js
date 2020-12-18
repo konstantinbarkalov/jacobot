@@ -85,6 +85,18 @@ class GameMaster {
         }
         return gamestepOutputMessage;
     }
+    onGameStat(genericUserGroupUid, genericUserGroupName) {
+        let statOutputMessage;
+        let gameUserGroup = this.gameUserStorage.getOrCreateGameUserGroup(genericUserGroupUid, genericUserGroupName);
+        const activeGame = this.activeGames.find(activeGame => activeGame.gameUserGroup === gameUserGroup);
+
+        if (activeGame) {
+            statOutputMessage = activeGame.onGameStat();
+        } else {
+            statOutputMessage = new MiscOutputMessage(null, 'В этом чате не идет активных игр. Быть может /help?');
+        }
+        return statOutputMessage;
+    }
     onAbort(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName) {
         let gamestepOutputMessage;
         let gameUser = this.gameUserStorage.getOrCreateGameUser(genericUserUid, genericUserName );

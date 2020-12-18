@@ -26,6 +26,7 @@ function startTelegramBot() {
     bot.command('debug', onDebug);
     // gameMaster driven commands
     bot.command('go', onGo);
+    bot.command('gamestat', onGameStat);
     bot.command('stop', onAbort);
     bot.command('abort', onAbort);
     bot.on('message', onMessage);
@@ -72,6 +73,13 @@ function onAbort(ctx) {
     const outputMessage = gameMaster.onAbort(genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName);
     richReply(ctx, outputMessage, genericUserGroupUid);
 }
+function onGameStat(ctx) {
+    const genericUserGroupUid = ctx.chat.id;
+    const genericUserGroupName = ctx.chat.first_name || ctx.chat.title;
+    const outputMessage = gameMaster.onGameStat(genericUserGroupUid, genericUserGroupName);
+    richReply(ctx, outputMessage, genericUserGroupUid);
+}
+
 async function onMessage(ctx) {
     const genericUserUid = ctx.from.id;
     const genericUserName = ctx.from.first_name;
