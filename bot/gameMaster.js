@@ -14,7 +14,6 @@ class GameMaster {
     activeGames = [];
     nlpBackend = new NlpBackend();
     gameUserStorage = null;
-    metrixAggregator = new MetrixAggregator();
     async preload() {
         await this.nlpBackend.preload();
         this.gameUserStorage = GameUserStorage.preloadFromNewOrExistedStorageFile();
@@ -26,7 +25,6 @@ class GameMaster {
     }
     removeActiveGame(game) {
         this.activeGames = this.activeGames.filter((activeGame) => activeGame !== game);
-        this.metrixAggregator.process(game);
     }
     onAbout() {
         return new MiscOutputMessage(null, aboutText);
@@ -56,17 +54,9 @@ class GameMaster {
         return new MiscOutputMessage(null, debugMessageJson);
     }
     onMetrix() {
-        const metrixStats = this.metrixAggregator.getMetrixStats();
-        const humanReadableStats = {
-            durationMean: (metrixStats.durationMean / 1000).toFixed(1) + ' sec',
-            stepsMean: (metrixStats.stepsMean).toFixed(1),
-            playersMean: (metrixStats.playersMean).toFixed(1),
-            bufferLength: metrixStats.bufferLength,
-            lastGameDate: metrixStats.lastGameDate ? new Date(metrixStats.lastGameDate) : 'never',
-
-        }
-        const statsAsJson = JSON.stringify(humanReadableStats, null, 4);
-        return new MiscOutputMessage(null, statsAsJson);
+        const metrixStats = MetrixAggregator.getMetrixStats(this.gameUserStorage);
+        const metrixStatsPrettyHtml = MetrixAggregator.getPrettyFormatedTextForStats(metrixStats);
+        return new MiscOutputMessage(null, metrixStatsPrettyHtml);
     }
     onUnknown() {
         const gamestepOutputMessage = new MiscOutputMessage(null, 'Если захочешь сыграть, пиши /go в чат.');
