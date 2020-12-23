@@ -59,8 +59,9 @@ class Game {
     onAction(fragmentText, player) {
         const checkGuessResult = this.hotWord.guess(fragmentText, player);
         const stat = this.hotWord.getStat();
-        const proximity = this.gameMaster.nlpBackend.getProximity(this.hotWord.lemmaText, fragmentText);
-        const rank = this.gameMaster.nlpBackend.getRank(fragmentText);
+        const nearest = this.randomCitation.hotChunk.entity.getNearest(fragmentText);
+        const proximity = nearest?.maxProximity;
+        const rank = nearest?.smartVectorRecord.vocabularyIdx;
         const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank);
         const referateText = PhraseBuilder.phrasesToText(referatePhrases);
         const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal, scoreGains} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank);
@@ -107,7 +108,7 @@ class Game {
                 const topSinonymIdx = this.hotWord.openBottomUnguessedTopSimonym(this.innitiatorGameUser);
                 if (topSinonymIdx !== null) {
                     const topSinonymText = this.hotWord.topSimonymTexts[topSinonymIdx];
-                    const topSinonymProximityPercent = (this.topSimonyms[topSinonymIdx].proximity * 100).toFixed(0) + '%';
+                    const topSinonymProximityPercent = (this.topSimonyms[topSinonymIdx].maxProximity * 100).toFixed(0) + '%';
                     aidPhrase = `💠 открываю новую нейроподсказку — топ-слово: #️⃣ <b>#${topSinonymIdx + 1} ${topSinonymText.toUpperCase()} ${topSinonymProximityPercent}</b>.`;
                 } else {
                     throw new Error();
@@ -164,7 +165,7 @@ class Game {
     }
 
     onGameStat() {
-        const hotWordRank = this.gameMaster.nlpBackend.getRank(this.hotWord.lemmaText);
+        const hotWordRank = this.randomCitation.hotChunk.entity.smartVectorRecord.vocabularyIdx;
         const stat = {
             'сложность': (this.difficultyRatio * 100).toFixed() + '%',
             'ход': this.stepNum + 1,
@@ -184,7 +185,6 @@ class Game {
             const positiveGamesCount = 1 + this.innitiatorGameUser.scoreStat.gamesCount * (logBase - 1) / logBase;
             const gamesCountLog = Math.log(positiveGamesCount) / Math.log(logBase);
             this.difficultyRatio = Math.max(0, Math.min(1, gamesCountLog));
-            this.difficultyRatio = 0;
             // 0.0 at 0, 1.0 at 1000, 0.5 at 30, 0.25 at 5, 0.75 at 177, 0.9 at 500
         } else {
             this.difficultyRatio = 0.5;
@@ -195,32 +195,21 @@ class Game {
 
         // difficulty based
         const desiredTag = (this.difficultyRatio < 0.2) ? 'NOUN' : undefined;
-        const maxRank =  150000 * this.difficultyRatio + 100 * (1 - this.difficultyRatio);
+        const maxRank = 150000 * this.difficultyRatio + 100 * (1 - this.difficultyRatio);
         const minRank = 100 * this.difficultyRatio + 0 * (1 - this.difficultyRatio);
+        const idealProximityToCluster = 0.3 * this.difficultyRatio + 0.7 * (1 - this.difficultyRatio);
 
-        const randomCitation = this.gameMaster.nlpBackend.getGoodCitation(desiredTag, maxRank, minRank);
+        const randomCitation = this.gameMaster.nlpBackend.getGoodCitation(desiredTag, maxRank, minRank, idealProximityToCluster);
         this.randomCitation = randomCitation;
-        const hotWordText = randomCitation.hotChunk.word.toLowerCase();
-        const hotWordLemma = randomCitation.hotChunk.lemma.toLowerCase();
-        const hotWordTag = randomCitation.hotChunk.tag;
+        const hotWordText = randomCitation.hotChunk.chunk.word.toLowerCase();
+        const hotWordLemma = randomCitation.hotChunk.chunk.lemma.toLowerCase();
+        const hotWordTag = randomCitation.hotChunk.chunk.tag;
 
-        this.topSimonyms = this.gameMaster.nlpBackend.getSimilar(hotWordLemma, 20, topSimonymRankThreshold, hotWordTag);
+        this.topSimonyms = randomCitation.hotChunk.entity.getNearests(20, topSimonymRankThreshold);
         const topSimonymTexts = this.topSimonyms.map(topSimonym => topSimonym.smartVectorRecord.lemma);
 
 
         this.hotWord = new HotWord(hotWordText, hotWordLemma, topSimonymTexts);
-
-        ////////
-        const a = this.gameMaster.nlpBackend.getSimilar(hotWordLemma, 20, 10000000000, hotWordTag);;
-        console.log('------');
-        console.log(this.hotWord.lemmaText, this.hotWord.wordText);
-        console.log('------');
-        console.log(a[0]);
-        console.log(a[1]);
-        console.log(a[2]);
-        console.log(a[3]);
-        console.log(a[4]);
-        //////////
 
         this.startTimestamp = Date.now();
         for (let i = 1; i < 5; i++) {
@@ -247,7 +236,7 @@ class Game {
         const isBigWord = fragmentText.length > 4;
         const isUncommonWord = rank > uncommonRankThreshold;
         const isTooRareToBeInTop = rank > topSimonymRankThreshold;
-        const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].proximity;
+        const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].maxProximity;
         const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
         const isHiddenTopSimonymJustGuessed = isTooRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
 
@@ -445,7 +434,7 @@ class Game {
         const isBigWord = fragmentText.length > 4;
         const isUncommonWord = rank > uncommonRankThreshold;
         const isTooRareToBeInTop = rank > topSimonymRankThreshold;
-        const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].proximity;
+        const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].maxProximity;
         const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
         const isHiddenTopSimonymJustGuessed = isTooRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
 
@@ -749,7 +738,7 @@ class Game {
                 lemma = '?'.repeat(topSimonym.smartVectorRecord.lemma.length);
             }
             const tag = topSimonym.smartVectorRecord.tag;
-            const proximityPercent = (topSimonym.proximity * 100).toFixed()+'%';
+            const proximityPercent = (topSimonym.maxProximity * 100).toFixed()+'%';
             const rank = topSimonym.smartVectorRecord.vocabularyIdx;
             const rankCategory = (rank > uncommonRankThreshold) ? 'нечаст.' : '';
             //const line = `#${idx + 1}: ${lemma} ${tag} ${proximityPercent} R${rankCategory}`;
@@ -769,7 +758,7 @@ class Game {
 
         if (this.randomCitation) {
             const randomCitationInfoText = this.getRandomCitationInfoText();
-            const [hotChunkWordPrefix, hotChunkWordPostfix] = this.randomCitation.hotChunk.text.split(this.randomCitation.hotChunk.word);
+            const [hotChunkWordPrefix, hotChunkWordPostfix] = this.randomCitation.hotChunk.chunk.text.split(this.randomCitation.hotChunk.chunk.word);
             citationText += randomCitationInfoText;
             citationText += `\n`;
             //citationText += `—`;

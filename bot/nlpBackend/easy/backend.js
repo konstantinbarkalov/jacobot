@@ -8,61 +8,11 @@ class EasyNlpBackend {
         await this.w2v.preload();
         await this.corpora.preload();
     }
-    getRandomLemma(tag = 'NOUN') {
-        const smartVectorRecord = this.getRandomSmartVectorRecord();
-        return smartVectorRecord.lemma;
-    }
-    getRandomSmartVectorRecord(tag = 'NOUN') {
-        const smartVectorRecords = this.w2v.smartVectorSet.byTag[tag];
-        const lemmas = Object.keys(smartVectorRecords);
-        const lemmaIdx = Math.floor(Math.random() * lemmas.length);
-        const lemma = lemmas[lemmaIdx];
-        return smartVectorRecords[lemma];
-    }
-    getProximity(lemmaA, lemmaB) {
-        const smartVectorsA = this.w2v.smartVectorSet.byWord[lemmaA];
-        const smartVectorsB = this.w2v.smartVectorSet.byWord[lemmaB];
-
-
-        if (smartVectorsA && smartVectorsB) {
-            const maxProximity = Object.values(smartVectorsA).reduce((maxProximity, smartVectorA) => {
-                maxProximity = Object.values(smartVectorsB).reduce((maxProximity, smartVectorB) => {
-                    const proximity = this.w2v.calcProximity(smartVectorA, smartVectorB);
-                    maxProximity = Math.max(proximity, maxProximity);
-                    return maxProximity;
-                }, maxProximity);
-                return maxProximity;
-            }, -Infinity);
-            return maxProximity;
-        } else {
-            return null;
-        }
-    }
-    getRank(lemma) {
-        const smartVectors = this.w2v.smartVectorSet.byWord[lemma];
-        if (smartVectors) {
-            const minRank = Object.values(smartVectors).reduce((minRank, smartVector) => {
-                const rank = smartVector.vocabularyIdx;
-                minRank = Math.min(rank, minRank);
-                return minRank;
-            }, Infinity);
-            return minRank;
-        } else {
-            return null;
-        }
-    }
-    getSimilar(lemma, count, maxRank = Infinity, tag = 'NOUN') {
-        const similars = this.w2v.findNearestsByLemma(lemma, tag, count, maxRank);
-        if (similars) {
-            return similars;
-        } else {
-            return null;
-        }
-    }
-    getGoodCitation(tag = 'NOUN', maxRank = Infinity, minRank = 0, goodTries = 10, maxTries = 100) {
+    // public
+    getGoodCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5, goodTries = 10, maxTries = 100) {
         let goodCitations = [];
         for (let tryIdx = 0; tryIdx < maxTries; tryIdx++) {
-            const citation = this.tryGetRandomCitation(tag, maxRank, minRank);
+            const citation = this.tryGetRandomCitation(tag, maxRank, minRank, idealProximityToCluster);
             if (citation !== null) {
                 goodCitations.push(citation)
                 if (goodCitations.length === goodTries) {
@@ -75,11 +25,34 @@ class EasyNlpBackend {
         }
         const sortedGoodCitations = goodCitations.sort((a, b) => b.mark - a.mark);
         const bestGoodCitation = sortedGoodCitations[0];
+        console.log(bestGoodCitation);
         return bestGoodCitation;
     }
-    tryGetRandomCitation(tag = 'NOUN', maxRank = Infinity, minRank = 0) {
+    getEntity(lemma, tag = 'ANY') {
+        const smartVectorRecordsForLemmaByTag = this.w2v.smartVectorRecordSet.byLemma[lemma];
+        if (!smartVectorRecordsForLemmaByTag) {
+            return null;
+        }
+        let smartVectorRecord;
+        if (tag === 'ANY') {
+            const sortedSmartVectorRecordsForLemmaByTag = Object.entries(smartVectorRecordsForLemmaByTag).sort(([tagA, smartVectorRecordA], [tagB, smartVectorRecordB]) => {
+                return smartVectorRecordB.vocabularyIdx - smartVectorRecordA.vocabularyIdx;
+            });
+            smartVectorRecord = sortedSmartVectorRecordsForLemmaByTag[0][1];
+        } else {
+            smartVectorRecord = smartVectorRecordsForLemmaByTag[tag];
+        }
+
+        if (!smartVectorRecord) {
+            return null;
+        }
+        return new NlpBackendEntity(this, smartVectorRecord);
+    }
+    // private
+    tryGetRandomCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5) {
         const corporaCitation = this.corpora.getRandomCitation();
         const chunks = corporaCitation.chunks;
+
         const lemmaCounts = chunks.reduce((chunkCounts, chunk) => {
             let chunkCount = chunkCounts[chunk.lemma] || 0;
             chunkCount++;
@@ -87,36 +60,36 @@ class EasyNlpBackend {
             return chunkCounts;
         }, {});
 
-        const wordChunks = chunks.filter((chunk) => chunk.tag !== 'PUNCT');
-        const wordFillRatio = wordChunks.length / chunks.length;
-
-        const vectorizableWordChunks = wordChunks.filter((wordChunk) => {
-            if (wordChunk.tag === 'PRON' || wordChunk.tag === 'CONJ' || wordChunk.tag === 'CCONJ' || wordChunk.tag === 'AUX' || wordChunk.tag === 'ADP' || wordChunk.tag === 'SCONJ' || wordChunk.tag === 'DET' || wordChunk.tag === 'PART') {
-                return false;
-            }
-            const rank = this.w2v.getRank(wordChunk.lemma, wordChunk.tag);
-            const isVectorizableWord = (rank !== null);
-            return isVectorizableWord;
+        const chunkWithEntities = chunks.map((chunk, chunkIdx) => {
+            return {
+                chunk,
+                entity: this.getEntity(chunk.lemma, chunk.tag),
+                chunkIdx
+            };
         });
-        const uniqueVectorizableLemmasCount = Object.keys(vectorizableWordChunks.reduce((uniqueVectorizableLemmas, vectorizableWordChunk) => {
-            uniqueVectorizableLemmas[vectorizableWordChunk.lemma] = true;
-            return uniqueVectorizableLemmas;
-        }, {})).length;
 
-        const minUniqueVectorizableLemmasCount = 10;
-        if (uniqueVectorizableLemmasCount < minUniqueVectorizableLemmasCount) {
-            console.warn('uniqueVectorizableLemmasCount < 10, dropping this one');
+        const knownChunkWithEntities = chunkWithEntities.filter(chunkWithEntity => !!chunkWithEntity.entity);
+        const knownWordWithEntitiesFillRatio = knownChunkWithEntities.length / chunkWithEntities.length;
+        const uniqueKnownEntities = Object.values(knownChunkWithEntities.reduce((uniqueKnownEntities, knownChunkWithEntity) => {
+            uniqueKnownEntities[knownChunkWithEntity.entity.smartVectorRecord.vocabularyIdx] = knownChunkWithEntity.entity;
+            return uniqueKnownEntities;
+        }, {}));
+        const uniqueKnownEntitiesCount = uniqueKnownEntities.length;
+        const minUniqueKnownEntitiesCount = 10;
+        if (uniqueKnownEntitiesCount < minUniqueKnownEntitiesCount) {
+            console.warn('uniqueKnownChunkWithEntities < 10, dropping this one');
             return null;
         }
 
-        const citationChunkHotCandidates = chunks.map((chunk, idx) => {
-            //// isGood for fliter later
-            const rank = this.w2v.getRank(chunk.lemma, chunk.tag);
+        const citationChunkHotCandidates = knownChunkWithEntities.map((knownChunkWithEntity) => {
+            //// isGood for filter later
+            const rank = knownChunkWithEntity.entity.smartVectorRecord.vocabularyIdx;
             const isGoodRank = (rank !== null && rank >= minRank && rank < maxRank);
-            const isGoodPredefinedTag = chunk.tag === tag;
-            const isGoodRussian = (/^[а-яА-Я]+$/).test(chunk.word); // TODO unstict - & ё
+
+            const isGoodPredefinedTag = (tag === 'ANY') ? true : knownChunkWithEntity.entity.smartVectorRecord.tag === tag;
+            const isGoodRussian = (/^[а-яА-Я]+$/).test(knownChunkWithEntity.chunk.word); // TODO unstict - & ё
             if (isGoodRank && !isGoodRussian) {
-                //debugger;
+                console.warn('isGoodRank && !isGoodRussian: ' + knownChunkWithEntity.chunk.word);
             }
             const isGood = isGoodRank && isGoodPredefinedTag && isGoodRussian;
 
@@ -125,27 +98,24 @@ class EasyNlpBackend {
 
             // hotLemmaCountsMark
             const hotLemmaMaxExtraCounts = 2;
-            const hotLemmaCounts = lemmaCounts[chunk.lemma];
+            const hotLemmaCounts = lemmaCounts[knownChunkWithEntity.chunk.lemma];
             const hotLemmaExtraCounts = hotLemmaCounts - 1;
             const hotLemmaCountsRatio = Math.min(1, Math.max(0, hotLemmaExtraCounts / hotLemmaMaxExtraCounts));
             // from 0 to 2 extra counts, where 1 extra count is only 0.2 mark 0.5^(1/3) = 0.8; 1 - 0.8 = 0.2
             const hotLemmaCountsMark = 1 - Math.pow(hotLemmaCountsRatio, 1/3);
 
-            // wordFillMark
-            const wordFillMark = Math.max(0, Math.min(1, wordFillRatio * 2 - 0.25)); // 0.25 to 0.75 known words to 0 to 1 mark
-
-            // uniqueVectorizableLemmasCountMark
-            const uniqueVectorizableLemmasCountMark = Math.max(0, Math.min(1, uniqueVectorizableLemmasCount ));
+            // knownWordWithEntitiesFillMark
+            const knownWordWithEntitiesFillMark = Math.max(0, Math.min(1, knownWordWithEntitiesFillRatio * 2 - 0.25)); // 0.25 to 0.75 known words to 0 to 1 mark
 
             // borderDistMark
             const middleFloatIdx = chunks.length / 2;
-            const idxDiff = idx - middleFloatIdx;
+            const idxDiff = knownChunkWithEntity.chunkIdx - middleFloatIdx;
             const idxDist = Math.abs(idxDiff);
             const middleDistRatio = idxDist / middleFloatIdx;
             const borderDistMark = 1 - Math.pow(middleDistRatio, 3);
 
             // lengthLogMark
-            const trimmedText = chunk.text.trim();
+            const trimmedText = knownChunkWithEntity.chunk.text.trim();
             const bestLengthLog = Math.log(8); // 8 simbols
             const lengthLog = Math.log(trimmedText.length);
             const lengthLogDiff = lengthLog - bestLengthLog;
@@ -157,15 +127,24 @@ class EasyNlpBackend {
             // freqFactor
             const freqNormingFactor = (rank + 100) / 5000;
 
+            //clusterMark
+            const clusterEntities = uniqueKnownEntities.filter(uniqueKnownEntity => uniqueKnownEntity.smartVectorRecord.vocabularyIdx !== knownChunkWithEntity.entity.smartVectorRecord.vocabularyIdx );
+            const clusterSmartVectorRecords = clusterEntities.map(clusterEntity => clusterEntity.smartVectorRecord);
+            const cluster = this.w2v.calcCluster(clusterSmartVectorRecords);
+            const proximityToCluster = this.w2v.calcProximityToCluster(knownChunkWithEntity.entity.smartVectorRecord, cluster);
+            const proximityToClusterDiff = Math.abs(proximityToCluster - idealProximityToCluster);
+            const clusterMark = Math.min(1, Math.max(0, 1 - proximityToClusterDiff));
+
             // total
-            const mark = hotLemmaCountsMark * wordFillMark * borderDistMark * lengthLogDistMark * freqNormingFactor;
+            const mark = hotLemmaCountsMark * knownWordWithEntitiesFillMark * borderDistMark * lengthLogDistMark * freqNormingFactor * clusterMark;
             return {
-                chunk,
-                idx,
+                chunk: knownChunkWithEntity,
+                idx: knownChunkWithEntity.chunkIdx,
                 isGood,
                 mark
             };
         });
+
         const filterdCitationChunkHotCandidates = citationChunkHotCandidates.filter(candidate => candidate.isGood);
         const sortedCitationChunkHotCandidates = filterdCitationChunkHotCandidates.sort((a,b)=> b.mark - a.mark);
         const bestHotCandidate = sortedCitationChunkHotCandidates[0];
@@ -191,6 +170,49 @@ class EasyNlpBackend {
         } else {
             return null;
         }
+    }
+
+}
+class NlpBackendEntity {
+    constructor(backend, smartVectorRecord) {
+        this.backend = backend;
+        const smartVectorRecordsForLemmaByTag = backend.w2v.smartVectorRecordSet.byLemma[smartVectorRecord.lemma];
+        this.smartVectorRecord = smartVectorRecord;
+        this.smartVectorRecordsForLemmaByTag = smartVectorRecordsForLemmaByTag;
+    }
+    getNearest(lemma) {
+        const smartVectorRecordsA = this.smartVectorRecordsForLemmaByTag;
+        const smartVectorRecordsB = this.backend.w2v.smartVectorRecordSet.byLemma[lemma];
+
+        if (smartVectorRecordsA && smartVectorRecordsB) {
+            const nearest = Object.values(smartVectorRecordsA).reduce((nearest, smartVectorRecordA) => {
+                nearest = Object.values(smartVectorRecordsB).reduce((nearest, smartVectorRecordB) => {
+                    const rawProximity = this.backend.w2v.calcProximityBetween(smartVectorRecordA, smartVectorRecordB);
+                    const debuffRatio = (this.smartVectorRecord.tag === smartVectorRecordA.tag) ? 1 : 0.95;
+                    const debuffedProximity = rawProximity * debuffRatio;
+                    if (debuffedProximity > nearest.maxProximity) {
+                        nearest.smartVectorRecord = smartVectorRecordB;
+                        nearest.maxProximity = debuffedProximity;
+                    }
+                    return nearest;
+                }, nearest);
+                return nearest;
+            }, {maxProximity: -Infinity, smartVectorRecord: null});
+            return nearest;
+        } else {
+            return null;
+        }
+    }
+    getNearests(limit = 10, maxRank = Infinity) {
+        const highEnoughLemmas = Object.entries(this.backend.w2v.smartVectorRecordSet.minVocabularyIdxByLemma).filter(([lemma, minVocabularyIdx]) => (lemma !== this.smartVectorRecord.lemma) && (minVocabularyIdx < maxRank) ).map(([lemma, minVocabularyIdx]) => lemma);
+        const nearests = highEnoughLemmas.map(lemma => {
+            const nearest = this.getNearest(lemma);
+            return nearest;
+        });
+        const sortedNearests = nearests.sort((a, b)=> b.maxProximity - a.maxProximity );
+
+        sortedNearests.splice(limit);
+        return sortedNearests || null;
     }
 }
 module.exports = EasyNlpBackend;
