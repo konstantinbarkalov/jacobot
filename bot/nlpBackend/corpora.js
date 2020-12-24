@@ -27,7 +27,7 @@ class Corpora {
     }
 
     loadBooksFromBooksJson() {
-        const booksDir = path.join(__dirname, '../../../data/books');
+        const booksDir = path.join(__dirname, '../../data/books');
         const booksConfig = require(path.join(booksDir, '/books.json'));
         return booksConfig.map(bookConfig => {
             const bookFilePath = path.join(booksDir, bookConfig.lemmatizedTextPath);
@@ -50,7 +50,13 @@ class Corpora {
             const [lemma, tag]  = taggedLemma.split('_');
             const stripWordRegexp = /[a-zA-Zа-яА-ЯёЁ-]+/;
             const stripResult = text.match(stripWordRegexp);
-            const word = stripResult?.[0];
+            let word;
+            if (stripResult) {
+                word = stripResult[0];
+            } else {
+                const garbage = /["'`«»„“!?.,;:—–…]+/g;
+                word = text.trim().replace(garbage, '');
+            }
             return {
                 lemma,
                 tag,

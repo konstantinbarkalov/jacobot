@@ -1,5 +1,5 @@
 const fs = require('fs');
-const NlpBackend = require('./nlpBackend/easy/backend.js');
+const NlpBackend = require('./nlpBackend/nlpBackend.js');
 //const Game = require("./game.js");
 const Game = require("./game.js");
 const GamestepOutputMessage = require("./gamestepOutputMessage.js");

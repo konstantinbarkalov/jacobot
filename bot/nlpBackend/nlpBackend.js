@@ -1,7 +1,7 @@
 const Corpora = require('./corpora.js');
 const W2v = require('./w2v.js');
 
-class EasyNlpBackend {
+class NlpBackend {
     w2v = new W2v();
     corpora = new Corpora();
     async preload() {
@@ -212,4 +212,4 @@ class NlpBackendEntity {
         return sortedNearests || null;
     }
 }
-module.exports = EasyNlpBackend;
+module.exports = NlpBackend;
