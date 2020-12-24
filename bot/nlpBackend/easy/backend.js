@@ -29,18 +29,15 @@ class EasyNlpBackend {
         return bestGoodCitation;
     }
     getEntity(lemma, tag = 'ANY') {
-        const smartVectorRecordsForLemmaByTag = this.w2v.smartVectorRecordSet.byLemma[lemma];
-        if (!smartVectorRecordsForLemmaByTag) {
+        const smartVectorRecordsetForLemma = this.w2v.smartVectorRecordSet.byLemma[lemma];
+        if (!smartVectorRecordsetForLemma) {
             return null;
         }
         let smartVectorRecord;
         if (tag === 'ANY') {
-            const sortedSmartVectorRecordsForLemmaByTag = Object.entries(smartVectorRecordsForLemmaByTag).sort(([tagA, smartVectorRecordA], [tagB, smartVectorRecordB]) => {
-                return smartVectorRecordB.vocabularyIdx - smartVectorRecordA.vocabularyIdx;
-            });
-            smartVectorRecord = sortedSmartVectorRecordsForLemmaByTag[0][1];
+            smartVectorRecord = smartVectorRecordsetForLemma.topRanked;
         } else {
-            smartVectorRecord = smartVectorRecordsForLemmaByTag[tag];
+            smartVectorRecord = smartVectorRecordsetForLemma.byTag[tag];
         }
 
         if (!smartVectorRecord) {
@@ -176,7 +173,7 @@ class EasyNlpBackend {
 class NlpBackendEntity {
     constructor(backend, smartVectorRecord) {
         this.backend = backend;
-        const smartVectorRecordsForLemmaByTag = backend.w2v.smartVectorRecordSet.byLemma[smartVectorRecord.lemma];
+        const smartVectorRecordsForLemmaByTag = backend.w2v.smartVectorRecordSet.byLemma[smartVectorRecord.lemma].byTag;
         this.smartVectorRecord = smartVectorRecord;
         this.smartVectorRecordsForLemmaByTag = smartVectorRecordsForLemmaByTag;
     }
@@ -204,7 +201,7 @@ class NlpBackendEntity {
         }
     }
     getNearests(limit = 10, maxRank = Infinity) {
-        const highEnoughLemmas = Object.entries(this.backend.w2v.smartVectorRecordSet.minVocabularyIdxByLemma).filter(([lemma, minVocabularyIdx]) => (lemma !== this.smartVectorRecord.lemma) && (minVocabularyIdx < maxRank) ).map(([lemma, minVocabularyIdx]) => lemma);
+        const highEnoughLemmas = Object.entries(this.backend.w2v.smartVectorRecordSet.byLemma).filter(([lemma, smartVectorRecordSetForLemma]) => (lemma !== this.smartVectorRecord.lemma) && (smartVectorRecordSetForLemma.topRanked.vocabularyIdx < maxRank) ).map(([lemma, smartVectorRecordSetForLemma]) => lemma);
         const nearests = highEnoughLemmas.map(lemma => {
             const nearest = this.getNearest(lemma);
             return nearest;

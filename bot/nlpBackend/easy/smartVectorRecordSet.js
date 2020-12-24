@@ -1,10 +1,17 @@
 const fs = require('fs');
 const SmartVectorRecord = require('./smartVectorRecord.js');
-class SmartVectorRecordSet {
+class SmartVectorRecordSetForLemma {
     byTag = {};
+    topRanked = null;
+    constructor(byTag) {
+        this.byTag = byTag;
+        this.topRanked = Object.values(this.byTag).sort((a, b) => a.vocabularyIdx - b.vocabularyIdx)[0];
+    }
+}
+class SmartVectorRecordSet {
     byLemma = {};
-    minVocabularyIdxByLemma = {};
     constructor(floatDb) {
+        const smartVectorRecordsbyLemma = {}; // temporary container to fill SmartVectorRecordSetForLemma later (because byTag dictionary must be fully filled before SmartVectorRecordSetForLemma initialization)
         floatDb.taggedLemmas.forEach((taggedLemma, taggedLemmaIdx) => {
             const vocabularyIdx = taggedLemmaIdx;
             const [lemma, tag] = taggedLemma.split('_');
@@ -15,26 +22,16 @@ class SmartVectorRecordSet {
             }
             const magnitude = Math.sqrt(magnitudeSquare);
             const smartVectorRecord = new SmartVectorRecord(vocabularyIdx, lemma, tag, magnitude);
-            let smartVectorRecordTagRecords = this.byTag[tag];
-            if (!smartVectorRecordTagRecords) {
-                smartVectorRecordTagRecords = {};
-            }
-            smartVectorRecordTagRecords[lemma] = smartVectorRecord;
 
-            let smartVectorRecordWordRecords = this.byLemma[lemma];
-            if (!smartVectorRecordWordRecords) {
-                smartVectorRecordWordRecords = {};
+            let smartVectorRecordsForLemmaByTag = smartVectorRecordsbyLemma[lemma];
+            if (!smartVectorRecordsForLemmaByTag) {
+                smartVectorRecordsForLemmaByTag = {};
             }
-            smartVectorRecordWordRecords[tag] = smartVectorRecord;
-
-            this.byTag[tag] = smartVectorRecordTagRecords;
-            this.byLemma[lemma] = smartVectorRecordWordRecords;
+            smartVectorRecordsForLemmaByTag[tag] = smartVectorRecord;
+            smartVectorRecordsbyLemma[lemma] = smartVectorRecordsForLemmaByTag;
         });
 
-        this.minVocabularyIdxByLemma = Object.fromEntries(Object.entries(this.byLemma).map(([lemma, smartVectorRecordsForLemmaByTag]) => {
-            return [lemma, Object.values(smartVectorRecordsForLemmaByTag).reduce((minVocabularyIdx, smartVectorRecord) => { return Math.min(minVocabularyIdx, smartVectorRecord.vocabularyIdx); }, Infinity)];
-        }));
-        return this;
+        this.byLemma = Object.fromEntries(Object.entries(smartVectorRecordsbyLemma).map(([lemma, smartVectorRecordsForLemmaByTag]) => [lemma, new SmartVectorRecordSetForLemma(smartVectorRecordsForLemmaByTag)] ));
     }
 }
 

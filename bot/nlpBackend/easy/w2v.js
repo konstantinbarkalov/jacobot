@@ -1,6 +1,5 @@
 const fs = require('fs');
 const FloatDb = require('./floatDb.js');
-const SmartVectorRecord = require('./smartVectorRecord.js');
 const SmartVectorRecordSet = require('./smartVectorRecordSet.js');
 class W2v {
     floatDb = new FloatDb();
@@ -46,30 +45,6 @@ class W2v {
             magnitude
         }
         return cluster;
-    }
-    getRank(referenceWord, tag = 'ANY') {
-        let smartVectorRecordsOfTag
-
-        if (tag === 'ANY') {
-            const sortedSmartVectorRecordsForLemmaByTag = Object.entries(smartVectorRecordsForLemmaByTag).sort(([tagA, smartVectorRecordA], [tagB, smartVectorRecordB]) => {
-                return smartVectorRecordB.vocabularyIdx - smartVectorRecordA.vocabularyIdx;
-            });
-            smartVectorRecordsOfTag = sortedSmartVectorRecordsForLemmaByTag[0][1];
-        } else {
-            smartVectorRecordsOfTag = this.smartVectorRecordSet.byTag[tag];
-        }
-
-
-        if (smartVectorRecordsOfTag) {
-            const smartVectorRecord = smartVectorRecordsOfTag[referenceWord];
-            if (smartVectorRecord) {
-                return smartVectorRecord.vocabularyIdx;
-            } else {
-                return null;
-            }
-        } else {
-            return null;
-        }
     }
 }
 
