@@ -48,7 +48,9 @@ class Corpora {
         const chunks = parts.map(part => {
             const [taggedLemma, text] = part.split('~');
             const [lemma, tag]  = taggedLemma.split('_');
-            const word = text.trim();
+            const stripWordRegexp = /[a-zA-Zа-яА-ЯёЁ-]+/;
+            const stripResult = text.match(stripWordRegexp);
+            const word = stripResult?.[0];
             return {
                 lemma,
                 tag,
