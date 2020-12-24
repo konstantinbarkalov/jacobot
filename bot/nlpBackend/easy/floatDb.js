@@ -39,12 +39,6 @@ class FloatDb {
 
         console.log('Loading floatDb data done.');
     }
-    getVector(vocabularyIdx) {
-        const plainStartIdx = vocabularyIdx * this.expectedVectorDim;
-        const clonedVector = this.data.slice(plainStartIdx, plainStartIdx + this.expectedVectorDim);
-        return clonedVector;
-    }
-
 }
 
 module.exports = FloatDb;

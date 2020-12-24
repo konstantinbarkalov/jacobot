@@ -1,10 +1,12 @@
 const fs = require('fs');
 const FloatDb = require('./floatDb.js');
+const SmartVectorRecord = require('./smartVectorRecord.js');
+const SmartVectorRecordSet = require('./smartVectorRecordSet.js');
 class W2v {
     floatDb = new FloatDb();
     async preload() {
         await this.floatDb.preload();
-        this.smartVectorRecordSet = W2v.buildSmartVectorRecordSetFromFloatDb(this.floatDb);
+        this.smartVectorRecordSet = new SmartVectorRecordSet(this.floatDb);
     }
     calcProximityBetween(smartVectorRecordA, smartVectorRecordB) {
         let sum = 0;
@@ -68,44 +70,6 @@ class W2v {
         } else {
             return null;
         }
-    }
-    static buildSmartVectorRecordSetFromFloatDb(floatDb) {
-        const smartVectorRecordSet = floatDb.taggedLemmas.reduce((smartVectorRecordSet, taggedLemma, taggedLemmaIdx) => {
-            //const plainIdx = taggedLemmaIdx * floatDb.expectedVectorDim;
-            const vector = floatDb.getVector(taggedLemmaIdx);
-            const magnitudeSquare = vector.reduce((magnitude, value) => {return magnitude + value * value }, 0 );
-            const magnitude = Math.sqrt(magnitudeSquare);
-            const [lemma, tag] = taggedLemma.split('_');
-            const vocabularyIdx = taggedLemmaIdx;
-            const smartVectorRecord = {
-                vocabularyIdx,
-                lemma,
-                tag,
-                magnitude,
-            }
-
-            let smartVectorRecordTagRecords = smartVectorRecordSet.byTag[tag];
-            if (!smartVectorRecordTagRecords) {
-                smartVectorRecordTagRecords = {};
-            }
-            smartVectorRecordTagRecords[lemma] = smartVectorRecord;
-
-            let smartVectorRecordWordRecords = smartVectorRecordSet.byLemma[lemma];
-            if (!smartVectorRecordWordRecords) {
-                smartVectorRecordWordRecords = {};
-            }
-            smartVectorRecordWordRecords[tag] = smartVectorRecord;
-
-            smartVectorRecordSet.byTag[tag] = smartVectorRecordTagRecords;
-            smartVectorRecordSet.byLemma[lemma] = smartVectorRecordWordRecords;
-            return smartVectorRecordSet;
-
-        }, {byTag: {}, byLemma: {}});
-        const minVocabularyIdxByLemma = Object.fromEntries(Object.entries(smartVectorRecordSet.byLemma).map(([lemma, smartVectorRecordsForLemmaByTag]) => {
-            return [lemma, Object.values(smartVectorRecordsForLemmaByTag).reduce((minVocabularyIdx, smartVectorRecord) => { return Math.min(minVocabularyIdx, smartVectorRecord.vocabularyIdx); }, Infinity)];
-        }));
-        smartVectorRecordSet.minVocabularyIdxByLemma = minVocabularyIdxByLemma;
-        return smartVectorRecordSet;
     }
 }
 
