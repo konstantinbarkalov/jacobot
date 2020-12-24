@@ -18,10 +18,11 @@ async function start() {
 function startTelegramBot() {
     // basic commands
     bot.start(onAbout);
-    bot.command('about', onAbout);
     bot.command('help', onHelp);
+    bot.command('about', onAbout);
     bot.command('?', onAbout);
     bot.command('rules', onRules);
+    bot.command('links', onLinks);
     bot.command('metrix', onMetrix);
     bot.command('debug', onDebug);
     // gameMaster driven commands
@@ -54,7 +55,10 @@ function onDebug(ctx) {
     const debugHtml = gameMaster.onDebug(ctx);
     ctx.reply(debugHtml.answer, {parse_mode: 'HTML', disable_web_page_preview: true});
 }
-
+function onLinks(ctx) {
+    const linksHtml = gameMaster.onLinks(ctx);
+    ctx.reply(linksHtml.answer, {parse_mode: 'HTML', disable_web_page_preview: true});
+}
 // gameMaster driven commands
 
 async function onGo(ctx) {

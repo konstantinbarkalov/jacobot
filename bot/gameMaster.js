@@ -6,9 +6,10 @@ const GamestepOutputMessage = require("./gamestepOutputMessage.js");
 const GameUserStorage = require('./gameUser/gameUserStorage.js');
 const MetrixAggregator = require('./metrixAggregator.js');
 const MiscOutputMessage = require('./miscOutputMessage.js');
-const aboutText = fs.readFileSync('./about.html',{encoding: 'utf8'});
-const rulesText = fs.readFileSync('./rules.html',{encoding: 'utf8'});
-const helpText = fs.readFileSync('./help.html',{encoding: 'utf8'});
+const aboutText = fs.readFileSync('./html/about.html',{encoding: 'utf8'});
+const rulesText = fs.readFileSync('./html/rules.html',{encoding: 'utf8'});
+const helpText = fs.readFileSync('./html/help.html',{encoding: 'utf8'});
+const linksText = fs.readFileSync('./html/links.html',{encoding: 'utf8'});
 const jacobotVersion = require('./package.json').version; // for debug
 class GameMaster {
     activeGames = [];
@@ -40,6 +41,11 @@ class GameMaster {
         return new MiscOutputMessage(null, helpText);
         //const liveHelpHtml = fs.readFileSync('./help.html',{encoding: 'utf8'});
         //return new MiscOutputMessage(null, liveHelpHtml);
+    }
+    onLinks() {
+        return new MiscOutputMessage(null, linksText);
+        //const liveLinksHtml = fs.readFileSync('./links.html',{encoding: 'utf8'});
+        //return new MiscOutputMessage(null, liveLinksHtml);
     }
     onDebug(ctx) {
 
