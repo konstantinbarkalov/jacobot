@@ -1,4 +1,4 @@
-class SmartVectorRecord {
+class VectorRecord {
     constructor(
         vocabularyIdx,
         lemma,
@@ -13,4 +13,4 @@ class SmartVectorRecord {
 }
 
 
-module.exports = SmartVectorRecord;
+module.exports = VectorRecord;

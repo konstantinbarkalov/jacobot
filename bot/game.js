@@ -61,7 +61,7 @@ class Game {
         const stat = this.hotWord.getStat();
         const nearest = this.randomCitation.hotChunk.entity.getNearest(fragmentText);
         const proximity = nearest?.maxProximity;
-        const rank = nearest?.smartVectorRecord.vocabularyIdx;
+        const rank = nearest?.vectorRecord.vocabularyIdx;
         const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank);
         const referateText = PhraseBuilder.phrasesToText(referatePhrases);
         const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal, scoreGains} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank);
@@ -165,7 +165,7 @@ class Game {
     }
 
     onGameStat() {
-        const hotWordRank = this.randomCitation.hotChunk.entity.smartVectorRecord.vocabularyIdx;
+        const hotWordRank = this.randomCitation.hotChunk.entity.vectorRecord.vocabularyIdx;
         const stat = {
             'сложность': (this.difficultyRatio * 100).toFixed() + '%',
             'ход': this.stepNum + 1,
@@ -206,7 +206,7 @@ class Game {
         const hotWordTag = randomCitation.hotChunk.chunk.tag;
 
         this.topSimonyms = randomCitation.hotChunk.entity.getNearests(20, topSimonymRankThreshold);
-        const topSimonymTexts = this.topSimonyms.map(topSimonym => topSimonym.smartVectorRecord.lemma);
+        const topSimonymTexts = this.topSimonyms.map(topSimonym => topSimonym.vectorRecord.lemma);
 
 
         this.hotWord = new HotWord(hotWordText, hotWordLemma, topSimonymTexts);
@@ -730,16 +730,16 @@ class Game {
         const stat = this.hotWord.getStat();
         const lines = [];
         this.topSimonyms.forEach((topSimonym, idx) => {
-            const isOpened = this.isDone || stat.topSimonym.guessedSimonyms.includes(topSimonym.smartVectorRecord.lemma);
+            const isOpened = this.isDone || stat.topSimonym.guessedSimonyms.includes(topSimonym.vectorRecord.lemma);
             let lemma;
             if (isOpened) {
-                lemma = topSimonym.smartVectorRecord.lemma;
+                lemma = topSimonym.vectorRecord.lemma;
             } else {
-                lemma = '?'.repeat(topSimonym.smartVectorRecord.lemma.length);
+                lemma = '?'.repeat(topSimonym.vectorRecord.lemma.length);
             }
-            const tag = topSimonym.smartVectorRecord.tag;
+            const tag = topSimonym.vectorRecord.tag;
             const proximityPercent = (topSimonym.maxProximity * 100).toFixed()+'%';
-            const rank = topSimonym.smartVectorRecord.vocabularyIdx;
+            const rank = topSimonym.vectorRecord.vocabularyIdx;
             const rankCategory = (rank > uncommonRankThreshold) ? 'нечаст.' : '';
             //const line = `#${idx + 1}: ${lemma} ${tag} ${proximityPercent} R${rankCategory}`;
             const line = `#${idx + 1}: ${lemma} ${proximityPercent} ${rankCategory}`;

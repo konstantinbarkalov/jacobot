@@ -29,21 +29,21 @@ class EasyNlpBackend {
         return bestGoodCitation;
     }
     getEntity(lemma, tag = 'ANY') {
-        const smartVectorRecordsetForLemma = this.w2v.smartVectorRecordSet.byLemma[lemma];
-        if (!smartVectorRecordsetForLemma) {
+        const vectorRecordsetForLemma = this.w2v.vectorRecordSet.byLemma[lemma];
+        if (!vectorRecordsetForLemma) {
             return null;
         }
-        let smartVectorRecord;
+        let vectorRecord;
         if (tag === 'ANY') {
-            smartVectorRecord = smartVectorRecordsetForLemma.topRanked;
+            vectorRecord = vectorRecordsetForLemma.topRanked;
         } else {
-            smartVectorRecord = smartVectorRecordsetForLemma.byTag[tag];
+            vectorRecord = vectorRecordsetForLemma.byTag[tag];
         }
 
-        if (!smartVectorRecord) {
+        if (!vectorRecord) {
             return null;
         }
-        return new NlpBackendEntity(this, smartVectorRecord);
+        return new NlpBackendEntity(this, vectorRecord);
     }
     // private
     tryGetRandomCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5) {
@@ -68,7 +68,7 @@ class EasyNlpBackend {
         const knownChunkWithEntities = chunkWithEntities.filter(chunkWithEntity => !!chunkWithEntity.entity);
         const knownWordWithEntitiesFillRatio = knownChunkWithEntities.length / chunkWithEntities.length;
         const uniqueKnownEntities = Object.values(knownChunkWithEntities.reduce((uniqueKnownEntities, knownChunkWithEntity) => {
-            uniqueKnownEntities[knownChunkWithEntity.entity.smartVectorRecord.vocabularyIdx] = knownChunkWithEntity.entity;
+            uniqueKnownEntities[knownChunkWithEntity.entity.vectorRecord.vocabularyIdx] = knownChunkWithEntity.entity;
             return uniqueKnownEntities;
         }, {}));
         const uniqueKnownEntitiesCount = uniqueKnownEntities.length;
@@ -80,10 +80,10 @@ class EasyNlpBackend {
 
         const citationChunkHotCandidates = knownChunkWithEntities.map((knownChunkWithEntity) => {
             //// isGood for filter later
-            const rank = knownChunkWithEntity.entity.smartVectorRecord.vocabularyIdx;
+            const rank = knownChunkWithEntity.entity.vectorRecord.vocabularyIdx;
             const isGoodRank = (rank !== null && rank >= minRank && rank < maxRank);
 
-            const isGoodPredefinedTag = (tag === 'ANY') ? true : knownChunkWithEntity.entity.smartVectorRecord.tag === tag;
+            const isGoodPredefinedTag = (tag === 'ANY') ? true : knownChunkWithEntity.entity.vectorRecord.tag === tag;
             const isGoodRussian = (/^[а-яА-Я]+$/).test(knownChunkWithEntity.chunk.word); // TODO unstict - & ё
             if (isGoodRank && !isGoodRussian) {
                 console.warn('isGoodRank && !isGoodRussian: ' + knownChunkWithEntity.chunk.word);
@@ -125,10 +125,10 @@ class EasyNlpBackend {
             const freqNormingFactor = (rank + 100) / 5000;
 
             //clusterMark
-            const clusterEntities = uniqueKnownEntities.filter(uniqueKnownEntity => uniqueKnownEntity.smartVectorRecord.vocabularyIdx !== knownChunkWithEntity.entity.smartVectorRecord.vocabularyIdx );
-            const clusterSmartVectorRecords = clusterEntities.map(clusterEntity => clusterEntity.smartVectorRecord);
-            const cluster = this.w2v.calcCluster(clusterSmartVectorRecords);
-            const proximityToCluster = this.w2v.calcProximityToCluster(knownChunkWithEntity.entity.smartVectorRecord, cluster);
+            const clusterEntities = uniqueKnownEntities.filter(uniqueKnownEntity => uniqueKnownEntity.vectorRecord.vocabularyIdx !== knownChunkWithEntity.entity.vectorRecord.vocabularyIdx );
+            const clusterVectorRecords = clusterEntities.map(clusterEntity => clusterEntity.vectorRecord);
+            const cluster = this.w2v.calcCluster(clusterVectorRecords);
+            const proximityToCluster = this.w2v.calcProximityToCluster(knownChunkWithEntity.entity.vectorRecord, cluster);
             const proximityToClusterDiff = Math.abs(proximityToCluster - idealProximityToCluster);
             const clusterMark = Math.min(1, Math.max(0, 1 - proximityToClusterDiff));
 
@@ -171,37 +171,37 @@ class EasyNlpBackend {
 
 }
 class NlpBackendEntity {
-    constructor(backend, smartVectorRecord) {
+    constructor(backend, vectorRecord) {
         this.backend = backend;
-        const smartVectorRecordsForLemmaByTag = backend.w2v.smartVectorRecordSet.byLemma[smartVectorRecord.lemma].byTag;
-        this.smartVectorRecord = smartVectorRecord;
-        this.smartVectorRecordsForLemmaByTag = smartVectorRecordsForLemmaByTag;
+        const vectorRecordsForLemmaByTag = backend.w2v.vectorRecordSet.byLemma[vectorRecord.lemma].byTag;
+        this.vectorRecord = vectorRecord;
+        this.vectorRecordsForLemmaByTag = vectorRecordsForLemmaByTag;
     }
     getNearest(lemma) {
-        const smartVectorRecordsA = this.smartVectorRecordsForLemmaByTag;
-        const smartVectorRecordsB = this.backend.w2v.smartVectorRecordSet.byLemma[lemma];
+        const vectorRecordsA = this.vectorRecordsForLemmaByTag;
+        const vectorRecordsB = this.backend.w2v.vectorRecordSet.byLemma[lemma];
 
-        if (smartVectorRecordsA && smartVectorRecordsB) {
-            const nearest = Object.values(smartVectorRecordsA).reduce((nearest, smartVectorRecordA) => {
-                nearest = Object.values(smartVectorRecordsB).reduce((nearest, smartVectorRecordB) => {
-                    const rawProximity = this.backend.w2v.calcProximityBetween(smartVectorRecordA, smartVectorRecordB);
-                    const debuffRatio = (this.smartVectorRecord.tag === smartVectorRecordA.tag) ? 1 : 0.95;
+        if (vectorRecordsA && vectorRecordsB) {
+            const nearest = Object.values(vectorRecordsA).reduce((nearest, vectorRecordA) => {
+                nearest = Object.values(vectorRecordsB).reduce((nearest, vectorRecordB) => {
+                    const rawProximity = this.backend.w2v.calcProximityBetween(vectorRecordA, vectorRecordB);
+                    const debuffRatio = (this.vectorRecord.tag === vectorRecordA.tag) ? 1 : 0.95;
                     const debuffedProximity = rawProximity * debuffRatio;
                     if (debuffedProximity > nearest.maxProximity) {
-                        nearest.smartVectorRecord = smartVectorRecordB;
+                        nearest.vectorRecord = vectorRecordB;
                         nearest.maxProximity = debuffedProximity;
                     }
                     return nearest;
                 }, nearest);
                 return nearest;
-            }, {maxProximity: -Infinity, smartVectorRecord: null});
+            }, {maxProximity: -Infinity, vectorRecord: null});
             return nearest;
         } else {
             return null;
         }
     }
     getNearests(limit = 10, maxRank = Infinity) {
-        const highEnoughLemmas = Object.entries(this.backend.w2v.smartVectorRecordSet.byLemma).filter(([lemma, smartVectorRecordSetForLemma]) => (lemma !== this.smartVectorRecord.lemma) && (smartVectorRecordSetForLemma.topRanked.vocabularyIdx < maxRank) ).map(([lemma, smartVectorRecordSetForLemma]) => lemma);
+        const highEnoughLemmas = Object.entries(this.backend.w2v.vectorRecordSet.byLemma).filter(([lemma, vectorRecordSetForLemma]) => (lemma !== this.vectorRecord.lemma) && (vectorRecordSetForLemma.topRanked.vocabularyIdx < maxRank) ).map(([lemma, vectorRecordSetForLemma]) => lemma);
         const nearests = highEnoughLemmas.map(lemma => {
             const nearest = this.getNearest(lemma);
             return nearest;
