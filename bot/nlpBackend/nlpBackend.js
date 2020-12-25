@@ -9,10 +9,10 @@ class NlpBackend {
         await this.corpora.preload();
     }
     // public
-    getGoodCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5, goodTries = 10, maxTries = 100) {
+    getGoodCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5, lemmasBlacklist = [], goodTries = 10, maxTries = 100) {
         let goodCitations = [];
         for (let tryIdx = 0; tryIdx < maxTries; tryIdx++) {
-            const citation = this.tryGetRandomCitation(tag, maxRank, minRank, idealProximityToCluster);
+            const citation = this.tryGetRandomCitation(tag, maxRank, minRank, idealProximityToCluster, lemmasBlacklist);
             if (citation !== null) {
                 goodCitations.push(citation)
                 if (goodCitations.length === goodTries) {
@@ -46,7 +46,7 @@ class NlpBackend {
         return new NlpBackendEntity(this, vectorRecord);
     }
     // private
-    tryGetRandomCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5) {
+    tryGetRandomCitation(tag = 'ANY', maxRank = Infinity, minRank = 0, idealProximityToCluster = 0.5, lemmasBlacklist = []) {
         const corporaCitation = this.corpora.getRandomCitation();
         const chunks = corporaCitation.chunks;
 
@@ -81,13 +81,13 @@ class NlpBackend {
         const citationChunkHotPreCandidates = knownChunkWithEntities.map((knownChunkWithEntity) => {
             const rank = knownChunkWithEntity.entity.vectorRecord.vocabularyIdx;
             const isGoodRank = (rank !== null && rank >= minRank && rank < maxRank);
-
+            const isBlacklisted = lemmasBlacklist.includes(knownChunkWithEntity.chunk.lemma);
             const isGoodPredefinedTag = (tag === 'ANY') ? true : knownChunkWithEntity.entity.vectorRecord.tag === tag;
             const isGoodRussian = (/^[а-яА-Я]+$/).test(knownChunkWithEntity.chunk.word); // TODO unstict - & ё
             if (isGoodRank && !isGoodRussian) {
                 console.warn('isGoodRank && !isGoodRussian: ' + knownChunkWithEntity.chunk.word);
             }
-            const isGood = isGoodRank && isGoodPredefinedTag && isGoodRussian;
+            const isGood = isGoodRank && isGoodPredefinedTag && isGoodRussian && !isBlacklisted;
             return {
                 knownChunkWithEntity,
                 isGood,
@@ -174,7 +174,7 @@ class NlpBackend {
             let shortPostfixChunks = postfixChunks.slice(0, 5);
             const citation = {
                 prefixText: prefixChunks.map(chunk => chunk.text).join(''),
-                knownChunkWithEntity,
+                hotChunkWithEntity: knownChunkWithEntity,
                 postfixText: postfixChunks.map(chunk => chunk.text).join(''),
                 shortPrefixText: shortPrefixChunks.map(chunk => chunk.text).join(''),
                 shortPostfixText: shortPostfixChunks.map(chunk => chunk.text).join(''),

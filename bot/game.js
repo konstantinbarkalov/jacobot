@@ -6,7 +6,7 @@ const HotWord = require('./hotWord.js');
 const MiscOutputMessage = require('./miscOutputMessage.js');
 const PhraseBuilder = require('./phraseBuilder.js');
 
-const uncommonRankThreshold = 70000;
+const uncommonRankThreshold = 60000;
 const topSimonymRankThreshold = 80000; // aka rareRankThreshold
 class Game {
     stepNum = 0;
@@ -156,6 +156,7 @@ class Game {
         this.players.forEach(player => {
             player.gameUser.scoreStat.addFromGame(this, player.gameUser.genericUserUid);
         });
+        this.gameUserGroup.recentStat.addFromGame(this);
         this.gameMaster.gameUserStorage.save();
         /// remove
 
@@ -213,7 +214,8 @@ class Game {
         const maxRank = 150000 * this.difficultyRatio + 100 * (1 - this.difficultyRatio);
         const minRank = 100 * this.difficultyRatio + 0 * (1 - this.difficultyRatio);
         const idealProximityToCluster = 0.3 * this.difficultyRatio + 0.7 * (1 - this.difficultyRatio);
-        const randomCitation = this.gameMaster.nlpBackend.getGoodCitation(desiredTag, maxRank, minRank, idealProximityToCluster);
+        const lemmasBlacklist = this.gameUserGroup.recentStat.recentHotLemmas;
+        const randomCitation = this.gameMaster.nlpBackend.getGoodCitation(desiredTag, maxRank, minRank, idealProximityToCluster, lemmasBlacklist);
         this.randomCitation = randomCitation;
         const hotWordText = randomCitation.hotChunkWithEntity.chunk.word.toLowerCase();
         const hotWordLemma = randomCitation.hotChunkWithEntity.chunk.lemma.toLowerCase();
@@ -239,6 +241,7 @@ class Game {
         this.players.forEach(player => {
             player.gameUser.scoreStat.addFromGame(this, player.gameUser.genericUserUid);
         });
+        this.gameUserGroup.recentStat.addFromGame(this);
         this.gameMaster.gameUserStorage.save();
         this.gameMaster.removeActiveGame(this);
     }
@@ -249,10 +252,9 @@ class Game {
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
         const isUncommonWord = rank > uncommonRankThreshold;
-        const isTooRareToBeInTop = rank > topSimonymRankThreshold;
         const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].maxProximity;
         const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
-        const isHiddenTopSimonymJustGuessed = isTooRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
+        const isHiddenTopSimonymJustGuessed = isHighEnoughToBeInTop && !checkGuessResult.topSimonym.isRobustGuess && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
 
         const upcasedFragmentText = fragmentText.toUpperCase();
         let phrase;
@@ -447,10 +449,9 @@ class Game {
         const isKnownWord = (proximity !== null) && !checkGuessResult.hotWord.isLetter;
         const isBigWord = fragmentText.length > 4;
         const isUncommonWord = rank > uncommonRankThreshold;
-        const isTooRareToBeInTop = rank > topSimonymRankThreshold;
         const lowestTopSimonymProximity = this.topSimonyms[this.topSimonyms.length - 1].maxProximity;
         const isHighEnoughToBeInTop = (proximity >= lowestTopSimonymProximity);
-        const isHiddenTopSimonymJustGuessed = isTooRareToBeInTop && isHighEnoughToBeInTop && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
+        const isHiddenTopSimonymJustGuessed = isHighEnoughToBeInTop && !checkGuessResult.topSimonym.isRobustGuess && !checkGuessResult.topSimonym.wasGuessed && !checkGuessResult.hotWord.isLetter && !checkGuessResult.hotWord.isEquallyHotLemma && !checkGuessResult.hotWord.isEquallyHotWord;
 
         let scoreGains = [];
         if (checkGuessResult.topSimonym.isRobustGuess) {
