@@ -25,6 +25,7 @@ function startTelegramBot() {
     bot.command('links', onLinks);
     bot.command('metrix', onMetrix);
     bot.command('debug', onDebug);
+    bot.command('difficulty', onDifficulty);
     // gameMaster driven commands
     bot.command('go', onGo);
     bot.command('gamestat', onGameStat);
@@ -81,6 +82,14 @@ function onGameStat(ctx) {
     const genericUserGroupUid = ctx.chat.id;
     const genericUserGroupName = ctx.chat.first_name || ctx.chat.title;
     const outputMessage = gameMaster.onGameStat(genericUserGroupUid, genericUserGroupName);
+    richReply(ctx, outputMessage, genericUserGroupUid);
+}
+function onDifficulty(ctx) {
+    const genericUserGroupUid = ctx.chat.id;
+    const genericUserGroupName = ctx.chat.first_name || ctx.chat.title;
+    const messageText = ctx.message.text ? ctx.message.text.trim() : '';
+    let cleanedMessageText = messageText;
+    const outputMessage = gameMaster.onDifficulty(cleanedMessageText, genericUserGroupUid, genericUserGroupName);
     richReply(ctx, outputMessage, genericUserGroupUid);
 }
 

@@ -105,6 +105,35 @@ class GameMaster {
         }
         return gamestepOutputMessage;
     }
+    onDifficulty(messageText, genericUserGroupUid, genericUserGroupName) {
+        let statOutputMessage;
+        const gameUserGroup = this.gameUserStorage.getOrCreateGameUserGroup(genericUserGroupUid, genericUserGroupName);
+        const parsePrecentMatchRegexp = /([0-9]+)%/;
+        const parsePrecentMatchResult = messageText.match(parsePrecentMatchRegexp);
+        const autoMatchRegexp = /auto/;
+        const autoMatchResult = messageText.match(autoMatchRegexp);
+        if (autoMatchResult) {
+            gameUserGroup.difficulty = 'auto';
+            statOutputMessage = new MiscOutputMessage(null, 'Сложность установлена в автоматический режим.');
+        } else if (parsePrecentMatchResult) {
+            const parsedPrecentString = parsePrecentMatchResult[1];
+            const parsedPrecent = parseInt(parsedPrecentString);
+            const difficultyRatio = parsedPrecent / 100;
+            if (difficultyRatio >= 0 && difficultyRatio <= 1) {
+                gameUserGroup.difficulty = difficultyRatio;
+                statOutputMessage = new MiscOutputMessage(null, 'Сложность установлена. ' + (difficultyRatio * 100).toFixed() +'%.');
+            } else {
+                statOutputMessage = new MiscOutputMessage(null, 'Сложность НЕ установлена!');
+            }
+        } else {
+            if (gameUserGroup.difficulty === 'auto') {
+                statOutputMessage = new MiscOutputMessage(null, 'Текущая сложность в группе: автоматически');
+            } else {
+                statOutputMessage = new MiscOutputMessage(null, 'Текущая сложность в группе: ' + (gameUserGroup.difficulty * 100).toFixed() +'%');
+            }
+        }
+        return statOutputMessage;
+    }
     onMessage(messageText, genericUserUid, genericUserName, genericUserGroupUid, genericUserGroupName) {
         let gamestepOutputMessage;
         let gameUser = this.gameUserStorage.getOrCreateGameUser(genericUserUid, genericUserName );

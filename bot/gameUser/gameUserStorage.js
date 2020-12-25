@@ -58,6 +58,7 @@ class GameUserStorage extends Plainable {
         const gameUser = this.users[genericUserUid];
         if (gameUser) {
             return gameUser;
+            gameUser.name = name;
         } else {
             const newGameUser = new GameUser(genericUserUid, name);
             this.users[genericUserUid] = newGameUser;
@@ -68,6 +69,7 @@ class GameUserStorage extends Plainable {
     getOrCreateGameUserGroup(genericUserGroupUid, title) {
         const gameUserGroup = this.groups[genericUserGroupUid];
         if (gameUserGroup) {
+            gameUserGroup.title = title;
             return gameUserGroup;
         } else {
             const newGameUserGroup = new GameUserGroup(genericUserGroupUid, title);

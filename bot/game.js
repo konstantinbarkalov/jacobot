@@ -195,16 +195,21 @@ class Game {
     }
 
     start() {
-        const isSingleplayer = this.gameUserGroup.genericUserGroupUid === this.innitiatorGameUser.genericUserUid;
-        if (isSingleplayer) {
-            const logBase = 1000;
-            const positiveGamesCount = 1 + this.innitiatorGameUser.scoreStat.gamesCount * (logBase - 1) / logBase;
-            const gamesCountLog = Math.log(positiveGamesCount) / Math.log(logBase);
-            this.difficultyRatio = Math.max(0, Math.min(1, gamesCountLog));
-            // 0.0 at 0, 1.0 at 1000, 0.5 at 30, 0.25 at 5, 0.75 at 177, 0.9 at 500
+        if (this.gameUserGroup.difficulty === 'auto') {
+            const isSingleplayer = this.gameUserGroup.genericUserGroupUid === this.innitiatorGameUser.genericUserUid;
+            if (isSingleplayer) {
+                const logBase = 1000;
+                const positiveGamesCount = 1 + this.innitiatorGameUser.scoreStat.gamesCount * (logBase - 1) / logBase;
+                const gamesCountLog = Math.log(positiveGamesCount) / Math.log(logBase);
+                this.difficultyRatio = Math.max(0, Math.min(1, gamesCountLog));
+                // 0.0 at 0, 1.0 at 1000, 0.5 at 30, 0.25 at 5, 0.75 at 177, 0.9 at 500
+            } else {
+                this.difficultyRatio = 0.5;
+            }
         } else {
-            this.difficultyRatio = 0.5;
+            this.difficultyRatio = this.gameUserGroup.difficulty;
         }
+
         this.isPlaing = true;
         this.isAborted = false;
         this.isDone = false;
