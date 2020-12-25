@@ -59,7 +59,7 @@ class Game {
     onAction(fragmentText, player) {
         const checkGuessResult = this.hotWord.guess(fragmentText, player);
         const stat = this.hotWord.getStat();
-        const nearest = this.randomCitation.hotChunk.entity.getNearest(fragmentText);
+        const nearest = this.randomCitation.hotChunkWithEntity.entity.getNearest(fragmentText);
         const proximity = nearest?.maxProximity;
         const rank = nearest?.vectorRecord.vocabularyIdx;
         const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank);
@@ -90,7 +90,7 @@ class Game {
 
             const scoreDetailsTextsPerTopPlayer = this.getGameScoreDetailsText(sortedPlayers); // do before game end (asd stats applied)
 
-            this.hotWord.openHotWord();
+            this.hotWord.openHotWord(this.stepNum, player.gameUser);
             this.end();
 
             const scoreSummaryTextsPerTopPlayer = this.getGameScoreSummaryText(sortedPlayers); // do after game end (asd stats applied)
@@ -105,7 +105,7 @@ class Game {
         } else {
             hintPhrase = '⏱ Следующий ход!..';
             if (stat.topSimonym.unguessedSimonyms.length) {
-                const topSinonymIdx = this.hotWord.openBottomUnguessedTopSimonym(this.innitiatorGameUser);
+                const topSinonymIdx = this.hotWord.openBottomUnguessedTopSimonym(this.stepNum, this.innitiatorGameUser);
                 if (topSinonymIdx !== null) {
                     const topSinonymText = this.hotWord.topSimonymTexts[topSinonymIdx];
                     const topSinonymProximityPercent = (this.topSimonyms[topSinonymIdx].maxProximity * 100).toFixed(0) + '%';
@@ -114,7 +114,7 @@ class Game {
                     throw new Error();
                 }
             } else if (stat.hotWord.unguessedLetters.length) {
-                const hotLetterIdx = this.hotWord.openRandomUnguessedHotLetter(this.innitiatorGameUser);
+                const hotLetterIdx = this.hotWord.openRandomUnguessedHotLetter(this.stepNum, this.innitiatorGameUser);
                 if (hotLetterIdx !== null) {
                     const hotWordLetter = this.hotWord.wordText[hotLetterIdx];
                     aidPhrase = `💠 новая подсказка: откроем букву — ❇️ "<b>${hotWordLetter.toUpperCase()}</b>". Есть идеи?`;
@@ -165,15 +165,30 @@ class Game {
     }
 
     onGameStat() {
-        const hotWordRank = this.randomCitation.hotChunk.entity.vectorRecord.vocabularyIdx;
-        const stat = {
-            'сложность': (this.difficultyRatio * 100).toFixed() + '%',
+        const hotWordRank = this.randomCitation.hotChunkWithEntity.entity.vectorRecord.vocabularyIdx;
+        const mark = this.randomCitation.mark;
+        const generalStat = {
+            'сложность': (this.difficultyRatio * 100).toFixed(2) + '%',
             'ход': this.stepNum + 1,
             'кол-во игроков': this.players.length,
             'статус игры': this.isPlaing ? (this.isInCooldown ? 'кулдаун' : 'игра в процессе' ) : this.isAborted ? 'игра сброшена' : this.isDone ? 'игра окончена' :'игра в коме',
             'ранг загаданного слова': hotWordRank,
         }
-        let statText = Object.entries(stat).map(([key, value]) => `${key}: ${value}`).join('\n');
+        const generalStatText = Object.entries(generalStat).map(([key, value]) => `${key}: ${value}`).join('\n');
+
+        const markStat = {
+            'borderDistMark': mark.borderDistMark,
+            'clusterMark': mark.clusterMark,
+            'freqNormingMark': mark.freqNormingMark,
+            'hotLemmaCountsMark': mark.hotLemmaCountsMark,
+            'knownWordWithEntitiesFillMark': mark.knownWordWithEntitiesFillMark,
+            'lengthLogDistMark': mark.lengthLogDistMark,
+            'noiseMark': mark.noiseMark,
+            'totalMark': mark.totalMark,
+
+        }
+        const markStatText = Object.entries(markStat).map(([key, value]) => `${key}: ${value}`).join('\n');
+        const statText = 'ОБЩЕЕ: \n' + generalStatText + '\n\nОЦЕНКИ ЦИТАТЫ: \n' + markStatText;
 
         return new MiscOutputMessage(this, statText);
     }
@@ -194,18 +209,17 @@ class Game {
         this.isDone = false;
 
         // difficulty based
-        const desiredTag = (this.difficultyRatio < 0.2) ? 'NOUN' : undefined;
+        const desiredTag = (this.difficultyRatio < 0.2) ? 'NOUN' : 'ANY';
         const maxRank = 150000 * this.difficultyRatio + 100 * (1 - this.difficultyRatio);
         const minRank = 100 * this.difficultyRatio + 0 * (1 - this.difficultyRatio);
         const idealProximityToCluster = 0.3 * this.difficultyRatio + 0.7 * (1 - this.difficultyRatio);
-
         const randomCitation = this.gameMaster.nlpBackend.getGoodCitation(desiredTag, maxRank, minRank, idealProximityToCluster);
         this.randomCitation = randomCitation;
-        const hotWordText = randomCitation.hotChunk.chunk.word.toLowerCase();
-        const hotWordLemma = randomCitation.hotChunk.chunk.lemma.toLowerCase();
-        const hotWordTag = randomCitation.hotChunk.chunk.tag;
+        const hotWordText = randomCitation.hotChunkWithEntity.chunk.word.toLowerCase();
+        const hotWordLemma = randomCitation.hotChunkWithEntity.chunk.lemma.toLowerCase();
+        const hotWordTag = randomCitation.hotChunkWithEntity.chunk.tag;
 
-        this.topSimonyms = randomCitation.hotChunk.entity.getNearests(20, topSimonymRankThreshold);
+        this.topSimonyms = randomCitation.hotChunkWithEntity.entity.getNearests(20, topSimonymRankThreshold);
         const topSimonymTexts = this.topSimonyms.map(topSimonym => topSimonym.vectorRecord.lemma);
 
 
@@ -213,7 +227,7 @@ class Game {
 
         this.startTimestamp = Date.now();
         for (let i = 1; i < 5; i++) {
-            this.hotWord.openBottomUnguessedTopSimonym(this.jacoGameUser);
+            this.hotWord.openBottomUnguessedTopSimonym(this.stepNum, this.jacoGameUser);
         }
         const {boardText, citationText} = this.getCurrentStateText();
         return new GamestepOutputMessage(this, 0, null, 'Погнали!', boardText, citationText, null, '⏱ Первый ход!..');
@@ -758,7 +772,7 @@ class Game {
 
         if (this.randomCitation) {
             const randomCitationInfoText = this.getRandomCitationInfoText();
-            const [hotChunkWordPrefix, hotChunkWordPostfix] = this.randomCitation.hotChunk.chunk.text.split(this.randomCitation.hotChunk.chunk.word);
+            const [hotChunkWordPrefix, hotChunkWordPostfix] = this.randomCitation.hotChunkWithEntity.chunk.text.split(this.randomCitation.hotChunkWithEntity.chunk.word);
             citationText += randomCitationInfoText;
             citationText += `\n`;
             //citationText += `—`;

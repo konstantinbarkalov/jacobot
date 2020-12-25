@@ -19,21 +19,22 @@ class HotWord {
             top: {},
         }
     }
-    guess(fragmentText, gameUser) {
-        const hotWord = this.guessHotWord(fragmentText, gameUser);
-        const topSimonym = this.guessTopSimonym(fragmentText, gameUser);
+    guess(fragmentText, stepNum, gameUser) {
+        const hotWord = this.guessHotWord(fragmentText, stepNum, gameUser);
+        const topSimonym = this.guessTopSimonym(fragmentText, stepNum, gameUser);
         const checkGuessResult = {
             hotWord,
             topSimonym,
         }
         return checkGuessResult;
     }
-    guessHotWord(fragmentText, gameUser) {
+    guessHotWord(fragmentText, stepNum, gameUser) {
         const checkGuessResult = this.checkGuessHotWord(fragmentText);
         const isLetter = checkGuessResult.isLetter;
         const isRobustGuess = checkGuessResult.isRobustGuess;
         const historyEvent = {
             gameUser,
+            stepNum,
             timestamp: Date.now(),
             mode: 'guess',
         }
@@ -113,11 +114,12 @@ class HotWord {
             isRobustGuess,
         };
     }
-    guessTopSimonym(fragmentText, gameUser) {
+    guessTopSimonym(fragmentText, stepNum, gameUser) {
         const checkGuessResult = this.checkGuessTopSimonym(fragmentText);
         const isRobustGuess = checkGuessResult.isRobustGuess;
         const historyEvent = {
             gameUser,
+            stepNum,
             timestamp: Date.now(),
             mode: 'guess',
         }
@@ -148,12 +150,13 @@ class HotWord {
             isRobustGuess,
         };
     }
-    openTopSimonym(idx, gameUser) {
+    openTopSimonym(idx, stepNum, gameUser) {
         const topSimonymText = this.topSimonymTexts[idx];
         const notYetGuessed = !this.guessHistory.simonym.top[topSimonymText];
         if (notYetGuessed) {
             const historyEvent = {
                 gameUser,
+                stepNum,
                 timestamp: Date.now(),
                 mode: 'open',
             }
@@ -163,12 +166,13 @@ class HotWord {
             return null;
         }
     }
-    openHotWordLetter(idx, gameUser) {
+    openHotWordLetter(idx, stepNum, gameUser) {
         const hotLetter = this.wordText[idx];
         const notYetGuessed = !this.guessHistory.fragment.letter.good[hotLetter];
         if (notYetGuessed) {
             const historyEvent = {
                 gameUser,
+                stepNum,
                 timestamp: Date.now(),
                 mode: 'open',
             }
@@ -178,11 +182,12 @@ class HotWord {
             return null;
         }
     }
-    openHotWord(gameUser) {
+    openHotWord(stepNum, gameUser) {
         const notYetGuessed = !this.guessHistory.fragment.good[this.wordText];
         if (notYetGuessed) {
             const historyEvent = {
                 gameUser,
+                stepNum,
                 timestamp: Date.now(),
                 mode: 'open',
             }
@@ -192,24 +197,24 @@ class HotWord {
             return false;
         }
     }
-    openBottomUnguessedTopSimonym(gameUser) {
+    openBottomUnguessedTopSimonym(stepNum, gameUser) {
         const unguessedTop = this.topSimonymTexts.map((topSimonymText, idx) => {return {topSimonymText, idx}}).filter(topSimonymTextWithIdx => !this.guessHistory.simonym.top[topSimonymTextWithIdx.topSimonymText]);
         const unguessedSimonymTextWidthIdx = unguessedTop[unguessedTop.length - 1];
         if (unguessedSimonymTextWidthIdx) {
             const unguessedSimonymIdx = unguessedSimonymTextWidthIdx.idx;
-            return this.openTopSimonym(unguessedSimonymIdx, gameUser);
+            return this.openTopSimonym(unguessedSimonymIdx, stepNum, gameUser);
         } else {
             return null;
         }
 
     }
-    openRandomUnguessedHotLetter(gameUser) {
+    openRandomUnguessedHotLetter(stepNum, gameUser) {
         const hotWordUnguessedLetterWithIdxes = this.wordText.split('').map((hotWordLetter, idx) => {return {hotWordLetter, idx}}).filter((hotWordLetterWithIdx) => !this.guessHistory.fragment.letter.good[hotWordLetterWithIdx.hotWordLetter]);
         if (hotWordUnguessedLetterWithIdxes.length > 0) {
             const randomIdx = Math.floor(Math.random() * hotWordUnguessedLetterWithIdxes.length);
             const hotWordUnguessedLetterWithIdx = hotWordUnguessedLetterWithIdxes[randomIdx];
             const hotWordLetterIdx = hotWordUnguessedLetterWithIdx.idx;
-            return this.openHotWordLetter(hotWordLetterIdx, gameUser);
+            return this.openHotWordLetter(hotWordLetterIdx, stepNum, gameUser);
         } else {
             return null;
         }

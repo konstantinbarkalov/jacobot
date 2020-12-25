@@ -23,7 +23,7 @@ class NlpBackend {
         if (goodCitations.length < goodTries) {
             throw new Error(`not enough good citations (${goodCitations.length} of ${goodTries} needed)`);
         }
-        const sortedGoodCitations = goodCitations.sort((a, b) => b.mark - a.mark);
+        const sortedGoodCitations = goodCitations.sort((a, b) => b.mark.totalMark - a.mark.totalMark);
         const bestGoodCitation = sortedGoodCitations[0];
         console.log(bestGoodCitation);
         return bestGoodCitation;
@@ -78,8 +78,7 @@ class NlpBackend {
             return null;
         }
 
-        const citationChunkHotCandidates = knownChunkWithEntities.map((knownChunkWithEntity) => {
-            //// isGood for filter later
+        const citationChunkHotPreCandidates = knownChunkWithEntities.map((knownChunkWithEntity) => {
             const rank = knownChunkWithEntity.entity.vectorRecord.vocabularyIdx;
             const isGoodRank = (rank !== null && rank >= minRank && rank < maxRank);
 
@@ -89,30 +88,35 @@ class NlpBackend {
                 console.warn('isGoodRank && !isGoodRussian: ' + knownChunkWithEntity.chunk.word);
             }
             const isGood = isGoodRank && isGoodPredefinedTag && isGoodRussian;
+            return {
+                knownChunkWithEntity,
+                isGood,
+            };
+        }).filter(citationChunkHotPreCandidate => citationChunkHotPreCandidate.isGood);
 
-
+        const citationChunkHotCandidates = citationChunkHotPreCandidates.map((citationChunkHotPreCandidate) => {
             //// marks
 
             // hotLemmaCountsMark
             const hotLemmaMaxExtraCounts = 2;
-            const hotLemmaCounts = lemmaCounts[knownChunkWithEntity.chunk.lemma];
+            const hotLemmaCounts = lemmaCounts[citationChunkHotPreCandidate.knownChunkWithEntity.chunk.lemma];
             const hotLemmaExtraCounts = hotLemmaCounts - 1;
             const hotLemmaCountsRatio = Math.min(1, Math.max(0, hotLemmaExtraCounts / hotLemmaMaxExtraCounts));
             // from 0 to 2 extra counts, where 1 extra count is only 0.2 mark 0.5^(1/3) = 0.8; 1 - 0.8 = 0.2
             const hotLemmaCountsMark = 1 - Math.pow(hotLemmaCountsRatio, 1/3);
 
             // knownWordWithEntitiesFillMark
-            const knownWordWithEntitiesFillMark = Math.max(0, Math.min(1, knownWordWithEntitiesFillRatio * 2 - 0.25)); // 0.25 to 0.75 known words to 0 to 1 mark
+            const knownWordWithEntitiesFillMark = Math.max(0, Math.min(1, knownWordWithEntitiesFillRatio * 2 - 0.25)); // 0.125 to 0.625 known words to 0 to 1 mark
 
             // borderDistMark
             const middleFloatIdx = chunks.length / 2;
-            const idxDiff = knownChunkWithEntity.chunkIdx - middleFloatIdx;
+            const idxDiff = citationChunkHotPreCandidate.knownChunkWithEntity.chunkIdx - middleFloatIdx;
             const idxDist = Math.abs(idxDiff);
             const middleDistRatio = idxDist / middleFloatIdx;
             const borderDistMark = 1 - Math.pow(middleDistRatio, 3);
 
             // lengthLogMark
-            const trimmedText = knownChunkWithEntity.chunk.text.trim();
+            const trimmedText = citationChunkHotPreCandidate.knownChunkWithEntity.chunk.text.trim();
             const bestLengthLog = Math.log(8); // 8 simbols
             const lengthLog = Math.log(trimmedText.length);
             const lengthLogDiff = lengthLog - bestLengthLog;
@@ -121,41 +125,56 @@ class NlpBackend {
             // [3  <-(5)- 8 -(13)->  23] simbols to => [0 (0.5) 1] ratio
             const lengthLogDistMark = 1 - Math.pow(lengthLogDistRatio, 3);
 
-            // freqFactor
-            const freqNormingFactor = (rank + 100) / 5000;
+            // freqNormingMark
+            const rank = citationChunkHotPreCandidate.knownChunkWithEntity.entity.vectorRecord.vocabularyIdx;
+            const freqNormingRatio = (rank + 300) / 100000;
+            const freqNormingClamedRatio = Math.max(0, Math.min(1,  freqNormingRatio));
+            const freqNormingMark = Math.pow(freqNormingClamedRatio, 1/3);
+            // const freqNormingFactor = Math.log(rank + 300) / Math.log(100000);
+            // const freqNormingMark = Math.max(0, Math.min(1, freqNormingFactor));
 
-            //clusterMark
-            const clusterEntities = uniqueKnownEntities.filter(uniqueKnownEntity => uniqueKnownEntity.vectorRecord.vocabularyIdx !== knownChunkWithEntity.entity.vectorRecord.vocabularyIdx );
+            // noiseMark
+            const normalNoiseSample = ( Math.random() + Math.random() + Math.random() + Math.random() - 2 ) / 2;
+            const noiseMark = Math.exp( normalNoiseSample ); // 0.36 to 2.7 at bounds, 0.77 to 1.2 at general
+
+            // clusterMark
+            const clusterEntities = uniqueKnownEntities.filter(uniqueKnownEntity => uniqueKnownEntity.vectorRecord.vocabularyIdx !== citationChunkHotPreCandidate.knownChunkWithEntity.entity.vectorRecord.vocabularyIdx );
             const clusterVectorRecords = clusterEntities.map(clusterEntity => clusterEntity.vectorRecord);
             const cluster = this.w2v.calcCluster(clusterVectorRecords);
-            const proximityToCluster = this.w2v.calcProximityToCluster(knownChunkWithEntity.entity.vectorRecord, cluster);
+            const proximityToCluster = this.w2v.calcProximityToCluster(citationChunkHotPreCandidate.knownChunkWithEntity.entity.vectorRecord, cluster);
             const proximityToClusterDiff = Math.abs(proximityToCluster - idealProximityToCluster);
             const clusterMark = Math.min(1, Math.max(0, 1 - proximityToClusterDiff));
 
             // total
-            const mark = hotLemmaCountsMark * knownWordWithEntitiesFillMark * borderDistMark * lengthLogDistMark * freqNormingFactor * clusterMark;
+            const totalMark = hotLemmaCountsMark * knownWordWithEntitiesFillMark * borderDistMark * lengthLogDistMark * clusterMark * freqNormingMark * noiseMark;
             return {
-                chunk: knownChunkWithEntity,
-                idx: knownChunkWithEntity.chunkIdx,
-                isGood,
-                mark
+                knownChunkWithEntity: citationChunkHotPreCandidate.knownChunkWithEntity,
+                mark: {
+                    totalMark,
+                    hotLemmaCountsMark,
+                    knownWordWithEntitiesFillMark,
+                    borderDistMark,
+                    lengthLogDistMark,
+                    clusterMark,
+                    freqNormingMark,
+                    noiseMark,
+                }
             };
         });
 
-        const filterdCitationChunkHotCandidates = citationChunkHotCandidates.filter(candidate => candidate.isGood);
-        const sortedCitationChunkHotCandidates = filterdCitationChunkHotCandidates.sort((a,b)=> b.mark - a.mark);
+        const sortedCitationChunkHotCandidates = citationChunkHotCandidates.sort((a,b)=> b.mark.totalMark - a.mark.totalMark);
         const bestHotCandidate = sortedCitationChunkHotCandidates[0];
         if (bestHotCandidate !== undefined) {
-            const bestHotCitationChunkIdx = bestHotCandidate.idx;
+            const bestHotCitationChunkIdx = bestHotCandidate.knownChunkWithEntity.chunkIdx;
             let prefixChunks = chunks.slice(0, bestHotCitationChunkIdx);
-            let hotChunk = bestHotCandidate.chunk; // or chunks[bestHotCitationChunkIdx];
+            let knownChunkWithEntity = bestHotCandidate.knownChunkWithEntity;
             let postfixChunks = chunks.slice(bestHotCitationChunkIdx + 1);
 
             let shortPrefixChunks = prefixChunks.slice(-5);
             let shortPostfixChunks = postfixChunks.slice(0, 5);
             const citation = {
                 prefixText: prefixChunks.map(chunk => chunk.text).join(''),
-                hotChunk,
+                knownChunkWithEntity,
                 postfixText: postfixChunks.map(chunk => chunk.text).join(''),
                 shortPrefixText: shortPrefixChunks.map(chunk => chunk.text).join(''),
                 shortPostfixText: shortPostfixChunks.map(chunk => chunk.text).join(''),
