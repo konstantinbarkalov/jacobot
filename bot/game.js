@@ -60,8 +60,14 @@ class Game {
         const checkGuessResult = this.hotWord.guess(fragmentText, player);
         const stat = this.hotWord.getStat();
         const nearest = this.randomCitation.hotChunkWithEntity.entity.getNearest(fragmentText);
-        const proximity = nearest?.maxProximity;
-        const rank = nearest?.vectorRecord.vocabularyIdx;
+
+        let proximity = null;
+        let rank = null;
+        if (nearest) {
+            proximity = nearest.maxProximity;
+            rank = nearest.vectorRecord.vocabularyIdx;
+        }
+
         const referatePhrases = this.referateAction(checkGuessResult, stat, player, fragmentText, proximity, rank);
         const referateText = PhraseBuilder.phrasesToText(referatePhrases);
         const {scoreGainTextLines, scoreGainSum, congratzMax, isFinal, scoreGains} = this.referateScoreGain(checkGuessResult, stat, player, fragmentText, proximity, rank);
